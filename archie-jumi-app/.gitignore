@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+work/
 test-results/
 *.log
 .DS_Store
