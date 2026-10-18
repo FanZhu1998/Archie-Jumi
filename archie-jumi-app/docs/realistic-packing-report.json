@@ -1,0 +1,1522 @@
+{
+  "generatedAt": "2026-10-17T04:15:25.444Z",
+  "frameSize": 512,
+  "results": [
+    {
+      "id": "archie",
+      "frameSize": 512,
+      "anchor": {
+        "x": 256,
+        "y": 464
+      },
+      "commonScale": 0.651,
+      "idleVisibleHeight": 391,
+      "atlas": {
+        "width": 2048,
+        "height": 6656,
+        "decodedMiB": 52
+      },
+      "pages": [
+        {
+          "file": "actions/idle.png",
+          "width": 2048,
+          "height": 512,
+          "decodedMiB": 4
+        },
+        {
+          "file": "actions/walk.png",
+          "width": 2048,
+          "height": 512,
+          "decodedMiB": 4
+        },
+        {
+          "file": "actions/trot.png",
+          "width": 2048,
+          "height": 512,
+          "decodedMiB": 4
+        },
+        {
+          "file": "actions/sit.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/groom.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/sleep.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/wake.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/pet.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/carried.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/land.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/pounce.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/eat.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/nose_touch.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        }
+      ],
+      "warnings": [
+        "nose_touch: 85 fine/low-alpha pixels touch a crop edge; inspect fur/whiskers.",
+        "trot_a: 71 fine/low-alpha pixels touch a crop edge; inspect fur/whiskers.",
+        "A wide/tall pose limits the common scale; idle height about 391px instead of 430px."
+      ],
+      "poses": {
+        "idle": {
+          "source": "archie-a.png",
+          "slot": 0,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 101,
+            "y": 69
+          },
+          "outputOpaqueBounds": {
+            "minX": 108,
+            "minY": 74,
+            "maxX": 406,
+            "maxY": 464,
+            "width": 299,
+            "height": 391,
+            "count": 68405,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 79,
+            "top": 6,
+            "width": 478,
+            "height": 612
+          },
+          "sourceOpaqueBounds": {
+            "minX": 90,
+            "minY": 14,
+            "maxX": 549,
+            "maxY": 613,
+            "width": 460,
+            "height": 600,
+            "count": 161598,
+            "edgeCount": 0
+          }
+        },
+        "blink": {
+          "source": "archie-a.png",
+          "slot": 1,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 102,
+            "y": 68
+          },
+          "outputOpaqueBounds": {
+            "minX": 109,
+            "minY": 73,
+            "maxX": 405,
+            "maxY": 463,
+            "width": 297,
+            "height": 391,
+            "count": 67807,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 0,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 74,
+            "top": 8,
+            "width": 475,
+            "height": 613
+          },
+          "sourceOpaqueBounds": {
+            "minX": 85,
+            "minY": 16,
+            "maxX": 540,
+            "maxY": 616,
+            "width": 456,
+            "height": 601,
+            "count": 160241,
+            "edgeCount": 0
+          }
+        },
+        "walk_a": {
+          "source": "archie-a.png",
+          "slot": 2,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 62,
+            "y": 127
+          },
+          "outputOpaqueBounds": {
+            "minX": 69,
+            "minY": 133,
+            "maxX": 444,
+            "maxY": 463,
+            "width": 376,
+            "height": 331,
+            "count": 71785,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 627,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 31,
+            "top": 37,
+            "width": 596,
+            "height": 522
+          },
+          "sourceOpaqueBounds": {
+            "minX": 41,
+            "minY": 45,
+            "maxX": 618,
+            "maxY": 554,
+            "width": 578,
+            "height": 510,
+            "count": 169390,
+            "edgeCount": 0
+          }
+        },
+        "walk_b": {
+          "source": "archie-a.png",
+          "slot": 3,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 69,
+            "y": 118
+          },
+          "outputOpaqueBounds": {
+            "minX": 75,
+            "minY": 124,
+            "maxX": 428,
+            "maxY": 463,
+            "width": 354,
+            "height": 340,
+            "count": 70552,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 627,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 45,
+            "top": 34,
+            "width": 574,
+            "height": 535
+          },
+          "sourceOpaqueBounds": {
+            "minX": 54,
+            "minY": 43,
+            "maxX": 596,
+            "maxY": 564,
+            "width": 543,
+            "height": 522,
+            "count": 166190,
+            "edgeCount": 0
+          }
+        },
+        "groom": {
+          "source": "archie-b.png",
+          "slot": 0,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 90,
+            "y": 68
+          },
+          "outputOpaqueBounds": {
+            "minX": 95,
+            "minY": 73,
+            "maxX": 412,
+            "maxY": 462,
+            "width": 318,
+            "height": 390,
+            "count": 75761,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 620,
+            "height": 630
+          },
+          "sourceCrop": {
+            "left": 63,
+            "top": 17,
+            "width": 509,
+            "height": 611
+          },
+          "sourceOpaqueBounds": {
+            "minX": 70,
+            "minY": 24,
+            "maxX": 557,
+            "maxY": 622,
+            "width": 488,
+            "height": 599,
+            "count": 178067,
+            "edgeCount": 0
+          }
+        },
+        "sleep": {
+          "source": "archie-b.png",
+          "slot": 1,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 58,
+            "y": 254
+          },
+          "outputOpaqueBounds": {
+            "minX": 65,
+            "minY": 259,
+            "maxX": 448,
+            "maxY": 464,
+            "width": 384,
+            "height": 206,
+            "count": 55977,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 620,
+            "top": 0,
+            "width": 634,
+            "height": 587
+          },
+          "sourceCrop": {
+            "left": 20,
+            "top": 256,
+            "width": 608,
+            "height": 330
+          },
+          "sourceOpaqueBounds": {
+            "minX": 30,
+            "minY": 263,
+            "maxX": 619,
+            "maxY": 578,
+            "width": 590,
+            "height": 316,
+            "count": 132017,
+            "edgeCount": 0
+          }
+        },
+        "wake": {
+          "source": "archie-b.png",
+          "slot": 2,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 43,
+            "y": 90
+          },
+          "outputOpaqueBounds": {
+            "minX": 47,
+            "minY": 95,
+            "maxX": 465,
+            "maxY": 464,
+            "width": 419,
+            "height": 370,
+            "count": 69844,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 630,
+            "width": 707,
+            "height": 624
+          },
+          "sourceCrop": {
+            "left": 36,
+            "top": 3,
+            "width": 654,
+            "height": 579
+          },
+          "sourceOpaqueBounds": {
+            "minX": 42,
+            "minY": 11,
+            "maxX": 684,
+            "maxY": 577,
+            "width": 643,
+            "height": 567,
+            "count": 164566,
+            "edgeCount": 0
+          }
+        },
+        "pet": {
+          "source": "archie-b.png",
+          "slot": 3,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 114,
+            "y": 62
+          },
+          "outputOpaqueBounds": {
+            "minX": 120,
+            "minY": 68,
+            "maxX": 391,
+            "maxY": 464,
+            "width": 272,
+            "height": 397,
+            "count": 70084,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 707,
+            "top": 587,
+            "width": 547,
+            "height": 667
+          },
+          "sourceCrop": {
+            "left": 14,
+            "top": 3,
+            "width": 438,
+            "height": 622
+          },
+          "sourceOpaqueBounds": {
+            "minX": 23,
+            "minY": 11,
+            "maxX": 441,
+            "maxY": 620,
+            "width": 419,
+            "height": 610,
+            "count": 165600,
+            "edgeCount": 0
+          }
+        },
+        "carried": {
+          "source": "archie-c.png",
+          "slot": 0,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 151,
+            "y": 11
+          },
+          "outputOpaqueBounds": {
+            "minX": 157,
+            "minY": 15,
+            "maxX": 355,
+            "maxY": 463,
+            "width": 199,
+            "height": 449,
+            "count": 59431,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 627,
+            "height": 713
+          },
+          "sourceCrop": {
+            "left": 149,
+            "top": 7,
+            "width": 322,
+            "height": 699
+          },
+          "sourceOpaqueBounds": {
+            "minX": 158,
+            "minY": 12,
+            "maxX": 462,
+            "maxY": 700,
+            "width": 305,
+            "height": 689,
+            "count": 139785,
+            "edgeCount": 0
+          }
+        },
+        "land": {
+          "source": "archie-c.png",
+          "slot": 1,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 68,
+            "y": 91
+          },
+          "outputOpaqueBounds": {
+            "minX": 73,
+            "minY": 95,
+            "maxX": 424,
+            "maxY": 463,
+            "width": 352,
+            "height": 369,
+            "count": 68135,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 0,
+            "width": 627,
+            "height": 697
+          },
+          "sourceCrop": {
+            "left": 22,
+            "top": 112,
+            "width": 578,
+            "height": 577
+          },
+          "sourceOpaqueBounds": {
+            "minX": 30,
+            "minY": 119,
+            "maxX": 570,
+            "maxY": 685,
+            "width": 541,
+            "height": 567,
+            "count": 161056,
+            "edgeCount": 0
+          }
+        },
+        "pounce": {
+          "source": "archie-c.png",
+          "slot": 2,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 67,
+            "y": 139
+          },
+          "outputOpaqueBounds": {
+            "minX": 72,
+            "minY": 144,
+            "maxX": 440,
+            "maxY": 463,
+            "width": 369,
+            "height": 320,
+            "count": 62024,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 713,
+            "width": 655,
+            "height": 541
+          },
+          "sourceCrop": {
+            "left": 46,
+            "top": 10,
+            "width": 580,
+            "height": 502
+          },
+          "sourceOpaqueBounds": {
+            "minX": 53,
+            "minY": 17,
+            "maxX": 620,
+            "maxY": 508,
+            "width": 568,
+            "height": 492,
+            "count": 146053,
+            "edgeCount": 0
+          }
+        },
+        "eat": {
+          "source": "archie-c.png",
+          "slot": 3,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 73,
+            "y": 141
+          },
+          "outputOpaqueBounds": {
+            "minX": 79,
+            "minY": 147,
+            "maxX": 433,
+            "maxY": 463,
+            "width": 355,
+            "height": 317,
+            "count": 58832,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 655,
+            "top": 697,
+            "width": 599,
+            "height": 557
+          },
+          "sourceCrop": {
+            "left": 24,
+            "top": 6,
+            "width": 562,
+            "height": 508
+          },
+          "sourceOpaqueBounds": {
+            "minX": 33,
+            "minY": 15,
+            "maxX": 578,
+            "maxY": 500,
+            "width": 546,
+            "height": 486,
+            "count": 138735,
+            "edgeCount": 0
+          }
+        },
+        "nose_touch": {
+          "source": "archie-d.png",
+          "slot": 0,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 50,
+            "y": 116
+          },
+          "outputOpaqueBounds": {
+            "minX": 58,
+            "minY": 121,
+            "maxX": 449,
+            "maxY": 463,
+            "width": 392,
+            "height": 343,
+            "count": 68988,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 670,
+            "height": 610
+          },
+          "sourceCrop": {
+            "left": 38,
+            "top": 48,
+            "width": 632,
+            "height": 537
+          },
+          "sourceOpaqueBounds": {
+            "minX": 50,
+            "minY": 55,
+            "maxX": 650,
+            "maxY": 581,
+            "width": 601,
+            "height": 527,
+            "count": 162377,
+            "edgeCount": 0
+          }
+        },
+        "trot_a": {
+          "source": "archie-d.png",
+          "slot": 1,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 69,
+            "y": 116
+          },
+          "outputOpaqueBounds": {
+            "minX": 79,
+            "minY": 120,
+            "maxX": 421,
+            "maxY": 463,
+            "width": 343,
+            "height": 344,
+            "count": 65978,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 670,
+            "top": 0,
+            "width": 584,
+            "height": 610
+          },
+          "sourceCrop": {
+            "left": 0,
+            "top": 50,
+            "width": 576,
+            "height": 538
+          },
+          "sourceOpaqueBounds": {
+            "minX": 16,
+            "minY": 57,
+            "maxX": 541,
+            "maxY": 584,
+            "width": 526,
+            "height": 528,
+            "count": 155699,
+            "edgeCount": 0
+          }
+        },
+        "trot_b": {
+          "source": "archie-d.png",
+          "slot": 2,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 52,
+            "y": 107
+          },
+          "outputOpaqueBounds": {
+            "minX": 58,
+            "minY": 112,
+            "maxX": 435,
+            "maxY": 463,
+            "width": 378,
+            "height": 352,
+            "count": 74196,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 610,
+            "width": 700,
+            "height": 644
+          },
+          "sourceCrop": {
+            "left": 35,
+            "top": 25,
+            "width": 628,
+            "height": 552
+          },
+          "sourceOpaqueBounds": {
+            "minX": 44,
+            "minY": 33,
+            "maxX": 623,
+            "maxY": 572,
+            "width": 580,
+            "height": 540,
+            "count": 174858,
+            "edgeCount": 0
+          }
+        },
+        "sit": {
+          "source": "archie-d.png",
+          "slot": 3,
+          "scale": 0.651,
+          "placedAt": {
+            "x": 104,
+            "y": 86
+          },
+          "outputOpaqueBounds": {
+            "minX": 110,
+            "minY": 90,
+            "maxX": 382,
+            "maxY": 463,
+            "width": 273,
+            "height": 374,
+            "count": 62772,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 700,
+            "top": 610,
+            "width": 554,
+            "height": 644
+          },
+          "sourceCrop": {
+            "left": 21,
+            "top": 13,
+            "width": 467,
+            "height": 584
+          },
+          "sourceOpaqueBounds": {
+            "minX": 30,
+            "minY": 19,
+            "maxX": 448,
+            "maxY": 593,
+            "width": 419,
+            "height": 575,
+            "count": 148157,
+            "edgeCount": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "jumi",
+      "frameSize": 512,
+      "anchor": {
+        "x": 256,
+        "y": 464
+      },
+      "commonScale": 0.698,
+      "idleVisibleHeight": 389,
+      "atlas": {
+        "width": 2048,
+        "height": 6656,
+        "decodedMiB": 52
+      },
+      "pages": [
+        {
+          "file": "actions/idle.png",
+          "width": 2048,
+          "height": 512,
+          "decodedMiB": 4
+        },
+        {
+          "file": "actions/walk.png",
+          "width": 2048,
+          "height": 512,
+          "decodedMiB": 4
+        },
+        {
+          "file": "actions/trot.png",
+          "width": 2048,
+          "height": 512,
+          "decodedMiB": 4
+        },
+        {
+          "file": "actions/sit.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/groom.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/sleep.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/wake.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/pet.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/carried.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/land.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/pounce.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/eat.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        },
+        {
+          "file": "actions/nose_touch.png",
+          "width": 1024,
+          "height": 512,
+          "decodedMiB": 2
+        }
+      ],
+      "warnings": [
+        "nose_touch: 96 fine/low-alpha pixels touch a crop edge; inspect fur/whiskers.",
+        "trot_a: 99 fine/low-alpha pixels touch a crop edge; inspect fur/whiskers.",
+        "A wide/tall pose limits the common scale; idle height about 389px instead of 430px."
+      ],
+      "poses": {
+        "idle": {
+          "source": "jumi-a.png",
+          "slot": 0,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 58,
+            "y": 70
+          },
+          "outputOpaqueBounds": {
+            "minX": 65,
+            "minY": 75,
+            "maxX": 449,
+            "maxY": 463,
+            "width": 385,
+            "height": 389,
+            "count": 87061,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 50,
+            "top": 43,
+            "width": 567,
+            "height": 569
+          },
+          "sourceOpaqueBounds": {
+            "minX": 59,
+            "minY": 50,
+            "maxX": 610,
+            "maxY": 606,
+            "width": 552,
+            "height": 557,
+            "count": 178472,
+            "edgeCount": 0
+          }
+        },
+        "blink": {
+          "source": "jumi-a.png",
+          "slot": 1,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 63,
+            "y": 72
+          },
+          "outputOpaqueBounds": {
+            "minX": 71,
+            "minY": 78,
+            "maxX": 443,
+            "maxY": 463,
+            "width": 373,
+            "height": 386,
+            "count": 87324,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 0,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 50,
+            "top": 47,
+            "width": 555,
+            "height": 566
+          },
+          "sourceOpaqueBounds": {
+            "minX": 61,
+            "minY": 55,
+            "maxX": 596,
+            "maxY": 608,
+            "width": 536,
+            "height": 554,
+            "count": 179592,
+            "edgeCount": 0
+          }
+        },
+        "walk_a": {
+          "source": "jumi-a.png",
+          "slot": 2,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 57,
+            "y": 111
+          },
+          "outputOpaqueBounds": {
+            "minX": 60,
+            "minY": 117,
+            "maxX": 445,
+            "maxY": 463,
+            "width": 386,
+            "height": 347,
+            "count": 80615,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 627,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 51,
+            "top": 22,
+            "width": 570,
+            "height": 508
+          },
+          "sourceOpaqueBounds": {
+            "minX": 56,
+            "minY": 30,
+            "maxX": 607,
+            "maxY": 526,
+            "width": 552,
+            "height": 497,
+            "count": 165412,
+            "edgeCount": 0
+          }
+        },
+        "walk_b": {
+          "source": "jumi-a.png",
+          "slot": 3,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 52,
+            "y": 102
+          },
+          "outputOpaqueBounds": {
+            "minX": 58,
+            "minY": 108,
+            "maxX": 444,
+            "maxY": 463,
+            "width": 387,
+            "height": 356,
+            "count": 84841,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 627,
+            "width": 627,
+            "height": 627
+          },
+          "sourceCrop": {
+            "left": 31,
+            "top": 25,
+            "width": 586,
+            "height": 521
+          },
+          "sourceOpaqueBounds": {
+            "minX": 40,
+            "minY": 33,
+            "maxX": 593,
+            "maxY": 542,
+            "width": 554,
+            "height": 510,
+            "count": 174144,
+            "edgeCount": 0
+          }
+        },
+        "groom": {
+          "source": "jumi-b.png",
+          "slot": 0,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 71,
+            "y": 90
+          },
+          "outputOpaqueBounds": {
+            "minX": 76,
+            "minY": 95,
+            "maxX": 437,
+            "maxY": 463,
+            "width": 362,
+            "height": 369,
+            "count": 88008,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 627,
+            "height": 600
+          },
+          "sourceCrop": {
+            "left": 71,
+            "top": 43,
+            "width": 530,
+            "height": 540
+          },
+          "sourceOpaqueBounds": {
+            "minX": 78,
+            "minY": 51,
+            "maxX": 595,
+            "maxY": 578,
+            "width": 518,
+            "height": 528,
+            "count": 180547,
+            "edgeCount": 0
+          }
+        },
+        "sleep": {
+          "source": "jumi-b.png",
+          "slot": 1,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 50,
+            "y": 252
+          },
+          "outputOpaqueBounds": {
+            "minX": 55,
+            "minY": 257,
+            "maxX": 458,
+            "maxY": 463,
+            "width": 404,
+            "height": 207,
+            "count": 61300,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 0,
+            "width": 627,
+            "height": 600
+          },
+          "sourceCrop": {
+            "left": 20,
+            "top": 261,
+            "width": 592,
+            "height": 308
+          },
+          "sourceOpaqueBounds": {
+            "minX": 27,
+            "minY": 267,
+            "maxX": 606,
+            "maxY": 563,
+            "width": 580,
+            "height": 297,
+            "count": 125969,
+            "edgeCount": 0
+          }
+        },
+        "wake": {
+          "source": "jumi-b.png",
+          "slot": 2,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 21,
+            "y": 67
+          },
+          "outputOpaqueBounds": {
+            "minX": 27,
+            "minY": 72,
+            "maxX": 488,
+            "maxY": 463,
+            "width": 462,
+            "height": 392,
+            "count": 85738,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 600,
+            "width": 747,
+            "height": 654
+          },
+          "sourceCrop": {
+            "left": 66,
+            "top": 17,
+            "width": 674,
+            "height": 573
+          },
+          "sourceOpaqueBounds": {
+            "minX": 74,
+            "minY": 23,
+            "maxX": 736,
+            "maxY": 585,
+            "width": 663,
+            "height": 563,
+            "count": 176318,
+            "edgeCount": 0
+          }
+        },
+        "pet": {
+          "source": "jumi-b.png",
+          "slot": 3,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 88,
+            "y": 71
+          },
+          "outputOpaqueBounds": {
+            "minX": 93,
+            "minY": 76,
+            "maxX": 403,
+            "maxY": 462,
+            "width": 311,
+            "height": 387,
+            "count": 82832,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 747,
+            "top": 600,
+            "width": 507,
+            "height": 654
+          },
+          "sourceCrop": {
+            "left": 5,
+            "top": 27,
+            "width": 481,
+            "height": 567
+          },
+          "sourceOpaqueBounds": {
+            "minX": 12,
+            "minY": 34,
+            "maxX": 456,
+            "maxY": 588,
+            "width": 445,
+            "height": 555,
+            "count": 169722,
+            "edgeCount": 0
+          }
+        },
+        "carried": {
+          "source": "jumi-c.png",
+          "slot": 0,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 128,
+            "y": 12
+          },
+          "outputOpaqueBounds": {
+            "minX": 135,
+            "minY": 18,
+            "maxX": 379,
+            "maxY": 463,
+            "width": 245,
+            "height": 446,
+            "count": 69980,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 627,
+            "height": 690
+          },
+          "sourceCrop": {
+            "left": 156,
+            "top": 28,
+            "width": 368,
+            "height": 655
+          },
+          "sourceOpaqueBounds": {
+            "minX": 165,
+            "minY": 37,
+            "maxX": 516,
+            "maxY": 675,
+            "width": 352,
+            "height": 639,
+            "count": 143486,
+            "edgeCount": 0
+          }
+        },
+        "land": {
+          "source": "jumi-c.png",
+          "slot": 1,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 72,
+            "y": 78
+          },
+          "outputOpaqueBounds": {
+            "minX": 78,
+            "minY": 83,
+            "maxX": 434,
+            "maxY": 463,
+            "width": 357,
+            "height": 381,
+            "count": 67288,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 627,
+            "top": 0,
+            "width": 627,
+            "height": 670
+          },
+          "sourceCrop": {
+            "left": 49,
+            "top": 96,
+            "width": 528,
+            "height": 557
+          },
+          "sourceOpaqueBounds": {
+            "minX": 58,
+            "minY": 104,
+            "maxX": 568,
+            "maxY": 649,
+            "width": 511,
+            "height": 546,
+            "count": 138547,
+            "edgeCount": 0
+          }
+        },
+        "pounce": {
+          "source": "jumi-c.png",
+          "slot": 2,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 62,
+            "y": 112
+          },
+          "outputOpaqueBounds": {
+            "minX": 68,
+            "minY": 118,
+            "maxX": 446,
+            "maxY": 463,
+            "width": 379,
+            "height": 346,
+            "count": 68544,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 690,
+            "width": 640,
+            "height": 564
+          },
+          "sourceCrop": {
+            "left": 47,
+            "top": 8,
+            "width": 556,
+            "height": 507
+          },
+          "sourceOpaqueBounds": {
+            "minX": 55,
+            "minY": 16,
+            "maxX": 598,
+            "maxY": 511,
+            "width": 544,
+            "height": 496,
+            "count": 140780,
+            "edgeCount": 0
+          }
+        },
+        "eat": {
+          "source": "jumi-c.png",
+          "slot": 3,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 59,
+            "y": 117
+          },
+          "outputOpaqueBounds": {
+            "minX": 64,
+            "minY": 123,
+            "maxX": 449,
+            "maxY": 463,
+            "width": 386,
+            "height": 341,
+            "count": 64784,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 640,
+            "top": 670,
+            "width": 614,
+            "height": 584
+          },
+          "sourceCrop": {
+            "left": 23,
+            "top": 15,
+            "width": 566,
+            "height": 506
+          },
+          "sourceOpaqueBounds": {
+            "minX": 30,
+            "minY": 24,
+            "maxX": 582,
+            "maxY": 511,
+            "width": 553,
+            "height": 488,
+            "count": 133064,
+            "edgeCount": 0
+          }
+        },
+        "nose_touch": {
+          "source": "jumi-d.png",
+          "slot": 0,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 35,
+            "y": 92
+          },
+          "outputOpaqueBounds": {
+            "minX": 41,
+            "minY": 97,
+            "maxX": 469,
+            "maxY": 463,
+            "width": 429,
+            "height": 367,
+            "count": 80157,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 0,
+            "width": 666,
+            "height": 610
+          },
+          "sourceCrop": {
+            "left": 32,
+            "top": 52,
+            "width": 634,
+            "height": 536
+          },
+          "sourceOpaqueBounds": {
+            "minX": 40,
+            "minY": 59,
+            "maxX": 654,
+            "maxY": 584,
+            "width": 615,
+            "height": 526,
+            "count": 164902,
+            "edgeCount": 0
+          }
+        },
+        "trot_a": {
+          "source": "jumi-d.png",
+          "slot": 1,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 52,
+            "y": 124
+          },
+          "outputOpaqueBounds": {
+            "minX": 55,
+            "minY": 129,
+            "maxX": 440,
+            "maxY": 464,
+            "width": 386,
+            "height": 336,
+            "count": 73187,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 666,
+            "top": 0,
+            "width": 588,
+            "height": 610
+          },
+          "sourceCrop": {
+            "left": 0,
+            "top": 102,
+            "width": 586,
+            "height": 492
+          },
+          "sourceOpaqueBounds": {
+            "minX": 4,
+            "minY": 110,
+            "maxX": 557,
+            "maxY": 589,
+            "width": 554,
+            "height": 480,
+            "count": 150281,
+            "edgeCount": 0
+          }
+        },
+        "trot_b": {
+          "source": "jumi-d.png",
+          "slot": 2,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 36,
+            "y": 104
+          },
+          "outputOpaqueBounds": {
+            "minX": 40,
+            "minY": 110,
+            "maxX": 453,
+            "maxY": 464,
+            "width": 414,
+            "height": 355,
+            "count": 85953,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 0,
+            "top": 610,
+            "width": 700,
+            "height": 644
+          },
+          "sourceCrop": {
+            "left": 43,
+            "top": 39,
+            "width": 631,
+            "height": 521
+          },
+          "sourceOpaqueBounds": {
+            "minX": 48,
+            "minY": 48,
+            "maxX": 642,
+            "maxY": 555,
+            "width": 595,
+            "height": 508,
+            "count": 176754,
+            "edgeCount": 0
+          }
+        },
+        "sit": {
+          "source": "jumi-d.png",
+          "slot": 3,
+          "scale": 0.698,
+          "placedAt": {
+            "x": 97,
+            "y": 80
+          },
+          "outputOpaqueBounds": {
+            "minX": 104,
+            "minY": 85,
+            "maxX": 396,
+            "maxY": 463,
+            "width": 293,
+            "height": 379,
+            "count": 75483,
+            "edgeCount": 0
+          },
+          "sourceRect": {
+            "left": 700,
+            "top": 610,
+            "width": 554,
+            "height": 644
+          },
+          "sourceCrop": {
+            "left": 26,
+            "top": 26,
+            "width": 456,
+            "height": 555
+          },
+          "sourceOpaqueBounds": {
+            "minX": 35,
+            "minY": 33,
+            "maxX": 455,
+            "maxY": 576,
+            "width": 421,
+            "height": 544,
+            "count": 155230,
+            "edgeCount": 0
+          }
+        }
+      }
+    }
+  ]
+}

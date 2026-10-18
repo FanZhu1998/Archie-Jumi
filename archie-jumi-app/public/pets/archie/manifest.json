@@ -1,0 +1,470 @@
+{
+  "formatVersion": 1,
+  "id": "archie",
+  "name": "Archie",
+  "atlas": "atlas.png",
+  "frameWidth": 512,
+  "frameHeight": 512,
+  "anchor": {
+    "x": 256,
+    "y": 464
+  },
+  "hitShapes": [
+    {
+      "x": 257,
+      "y": 269,
+      "rx": 149.5,
+      "ry": 195.5
+    }
+  ],
+  "pages": {
+    "idle": {
+      "file": "actions/idle.png",
+      "offsetX": 0,
+      "offsetY": 0
+    },
+    "walk": {
+      "file": "actions/walk.png",
+      "offsetX": 0,
+      "offsetY": 512
+    },
+    "trot": {
+      "file": "actions/trot.png",
+      "offsetX": 0,
+      "offsetY": 1024
+    },
+    "sit": {
+      "file": "actions/sit.png",
+      "offsetX": 0,
+      "offsetY": 1536
+    },
+    "groom": {
+      "file": "actions/groom.png",
+      "offsetX": 0,
+      "offsetY": 2048
+    },
+    "sleep": {
+      "file": "actions/sleep.png",
+      "offsetX": 0,
+      "offsetY": 2560
+    },
+    "wake": {
+      "file": "actions/wake.png",
+      "offsetX": 0,
+      "offsetY": 3072
+    },
+    "pet": {
+      "file": "actions/pet.png",
+      "offsetX": 0,
+      "offsetY": 3584
+    },
+    "carried": {
+      "file": "actions/carried.png",
+      "offsetX": 0,
+      "offsetY": 4096
+    },
+    "land": {
+      "file": "actions/land.png",
+      "offsetX": 0,
+      "offsetY": 4608
+    },
+    "pounce": {
+      "file": "actions/pounce.png",
+      "offsetX": 0,
+      "offsetY": 5120
+    },
+    "eat": {
+      "file": "actions/eat.png",
+      "offsetX": 0,
+      "offsetY": 5632
+    },
+    "nose_touch": {
+      "file": "actions/nose_touch.png",
+      "offsetX": 0,
+      "offsetY": 6144
+    }
+  },
+  "animations": {
+    "idle": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 0,
+            "w": 512,
+            "h": 512,
+            "duration": 2800
+          },
+          {
+            "x": 512,
+            "y": 0,
+            "w": 512,
+            "h": 512,
+            "duration": 140
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 1024,
+            "y": 0,
+            "w": 512,
+            "h": 512,
+            "duration": 2800
+          },
+          {
+            "x": 1536,
+            "y": 0,
+            "w": 512,
+            "h": 512,
+            "duration": 140
+          }
+        ],
+        "loop": true
+      }
+    },
+    "walk": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 512,
+            "w": 512,
+            "h": 512,
+            "duration": 160
+          },
+          {
+            "x": 512,
+            "y": 512,
+            "w": 512,
+            "h": 512,
+            "duration": 160
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 1024,
+            "y": 512,
+            "w": 512,
+            "h": 512,
+            "duration": 160
+          },
+          {
+            "x": 1536,
+            "y": 512,
+            "w": 512,
+            "h": 512,
+            "duration": 160
+          }
+        ],
+        "loop": true
+      }
+    },
+    "trot": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 1024,
+            "w": 512,
+            "h": 512,
+            "duration": 105
+          },
+          {
+            "x": 512,
+            "y": 1024,
+            "w": 512,
+            "h": 512,
+            "duration": 105
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 1024,
+            "y": 1024,
+            "w": 512,
+            "h": 512,
+            "duration": 105
+          },
+          {
+            "x": 1536,
+            "y": 1024,
+            "w": 512,
+            "h": 512,
+            "duration": 105
+          }
+        ],
+        "loop": true
+      }
+    },
+    "sit": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 1536,
+            "w": 512,
+            "h": 512,
+            "duration": 1600
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 1536,
+            "w": 512,
+            "h": 512,
+            "duration": 1600
+          }
+        ],
+        "loop": true
+      }
+    },
+    "groom": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 2048,
+            "w": 512,
+            "h": 512,
+            "duration": 1300
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 2048,
+            "w": 512,
+            "h": 512,
+            "duration": 1300
+          }
+        ],
+        "loop": true
+      }
+    },
+    "sleep": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 2560,
+            "w": 512,
+            "h": 512,
+            "duration": 2000
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 2560,
+            "w": 512,
+            "h": 512,
+            "duration": 2000
+          }
+        ],
+        "loop": true
+      }
+    },
+    "wake": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 3072,
+            "w": 512,
+            "h": 512,
+            "duration": 1100
+          }
+        ],
+        "loop": false
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 3072,
+            "w": 512,
+            "h": 512,
+            "duration": 1100
+          }
+        ],
+        "loop": false
+      }
+    },
+    "pet": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 3584,
+            "w": 512,
+            "h": 512,
+            "duration": 1700
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 3584,
+            "w": 512,
+            "h": 512,
+            "duration": 1700
+          }
+        ],
+        "loop": true
+      }
+    },
+    "carried": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 4096,
+            "w": 512,
+            "h": 512,
+            "duration": 1000
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 4096,
+            "w": 512,
+            "h": 512,
+            "duration": 1000
+          }
+        ],
+        "loop": true
+      }
+    },
+    "land": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 4608,
+            "w": 512,
+            "h": 512,
+            "duration": 500
+          }
+        ],
+        "loop": false
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 4608,
+            "w": 512,
+            "h": 512,
+            "duration": 500
+          }
+        ],
+        "loop": false
+      }
+    },
+    "pounce": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 5120,
+            "w": 512,
+            "h": 512,
+            "duration": 650
+          }
+        ],
+        "loop": false
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 5120,
+            "w": 512,
+            "h": 512,
+            "duration": 650
+          }
+        ],
+        "loop": false
+      }
+    },
+    "eat": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 5632,
+            "w": 512,
+            "h": 512,
+            "duration": 1500
+          }
+        ],
+        "loop": true
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 5632,
+            "w": 512,
+            "h": 512,
+            "duration": 1500
+          }
+        ],
+        "loop": true
+      }
+    },
+    "nose_touch": {
+      "right": {
+        "frames": [
+          {
+            "x": 0,
+            "y": 6144,
+            "w": 512,
+            "h": 512,
+            "duration": 1100
+          }
+        ],
+        "loop": false
+      },
+      "left": {
+        "frames": [
+          {
+            "x": 512,
+            "y": 6144,
+            "w": 512,
+            "h": 512,
+            "duration": 1100
+          }
+        ],
+        "loop": false
+      }
+    }
+  },
+  "attribution": "Reference-derived realistic kitten artwork generated for Archie & Jumi, mechanically alpha-trimmed, uniformly scaled and packed locally. Original photographs are not bundled. Left-facing frames are mirrored fallbacks, including asymmetric markings. Personality presets are fictional and editable."
+}

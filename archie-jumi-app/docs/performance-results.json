@@ -1,0 +1,41 @@
+{
+  "version": "1.0.1",
+  "environment": {
+    "os": "10.0.26200",
+    "cpu": "AMD Ryzen 5 5500U with Radeon Graphics",
+    "logicalProcessors": 12,
+    "displayScale": 1.25
+  },
+  "method": "Approximately five seconds per phase; two kittens; control panel closed; CPU is percentage of total system capacity; working sets summed across app processes",
+  "phases": [
+    {
+      "state": "resting",
+      "totalSystemCpuPercent": 0.486,
+      "meanWorkingSetMiB": 372.805,
+      "maxWorkingSetMiB": 373.324,
+      "sceneRendersPerSecond": 0,
+      "spriteDraws": 0
+    },
+    {
+      "state": "active-play",
+      "totalSystemCpuPercent": 1.5881,
+      "meanWorkingSetMiB": 397.709,
+      "maxWorkingSetMiB": 401.844,
+      "sceneRendersPerSecond": 29.966,
+      "spriteDraws": 300
+    },
+    {
+      "state": "hidden",
+      "totalSystemCpuPercent": 0.032,
+      "meanWorkingSetMiB": 402.069,
+      "maxWorkingSetMiB": 402.395,
+      "sceneRendersPerSecond": 0,
+      "spriteDraws": 0
+    }
+  ],
+  "limitations": [
+    "Short instrumented measurement, not a long-duration soak test",
+    "GPU utilization and response latency not measured",
+    "Shared pages may be counted in more than one process working set"
+  ]
+}
