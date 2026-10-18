@@ -7,7 +7,9 @@ export interface Point { x: number; y: number }
 export interface Size { width: number; height: number }
 export interface Personality { playfulness: number; sociability: number; energy: number }
 export interface PetPreferences { name: string; visible: boolean; size: number; personality: Personality; position: Point }
-export interface Preferences { sound: boolean; volume: number; reducedMotion: boolean; quiet: boolean; launchAtLogin: boolean; shortcut: string; selectedDisplay: string | null; pets: Record<PetId, PetPreferences> }
+export interface Preferences { sound: boolean; volume: number; reducedMotion: boolean; quiet: boolean; launchAtLogin: boolean; shortcut: string; selectedDisplay: string | null; pets: Record<PetId, PetPreferences>;
+  /** Kittens notice a resting cursor and may wander over (1.1.0; additive, schema stays 1). */
+  curious: boolean }
 export interface SavedState { schemaVersion: 1; preferences: Preferences }
 export interface DisplayInfo { id: string; label: string; width: number; height: number; scaleFactor: number; primary: boolean }
 export interface Bootstrap {
@@ -31,17 +33,35 @@ export interface ScenePetCarryOver { action: Action; facing: Facing; forcedSleep
 /** The last scene state a renderer reported, restored by the next overlay generation. */
 export interface SceneCarryOver { generation: number; pets: Record<PetId, ScenePetCarryOver> }
 export interface DiagnosticsResult { ok: boolean; message: string; entries?: number }
-export interface PetState { id: PetId; x: number; y: number; action: Action; actionTime: number; facing: Facing; forcedSleep: boolean; visible: boolean; size: number; target: Point | null }
+/** A pounce leap: position moves linearly from `from` to `to`; `progress` 0..1; `height` is the apex in DIP (the arc is drawn by the motion layer). */
+export interface LeapState { fromX: number; fromY: number; toX: number; toY: number; progress: number; height: number }
+/**
+ * A dropped treat. `x`/`y` use pet-centre coordinates: it lies on the ground line of a kitten whose centre is at `y`
+ * (the renderer adds the foot offset), `z` DIP above it. At most one per kitten.
+ */
+export interface TreatState { petId: PetId; x: number; y: number; z: number; phase: 'falling' | 'resting' | 'eaten'; elapsed: number }
+export interface PetState {
+  id: PetId; x: number; y: number; action: Action; actionTime: number; facing: Facing; forcedSleep: boolean; visible: boolean; size: number; target: Point | null;
+  /** Current movement speed in DIP/s; 0 when stationary. */
+  speed: number;
+  leap: LeapState | null;
+  /** A held (press-and-hold) pet is in progress. */
+  held: boolean;
+}
 export interface ToyState extends Point { petId: PetId; remaining: number; automatic: boolean; held: boolean }
 export interface PairState { kind: 'nose_touch' | 'nap'; phase: 'approach' | 'together'; elapsed: number }
-export interface SceneSnapshot { pets: PetState[]; toy: ToyState | null; pair: PairState | null; time: number; quiet: boolean }
+export interface SceneSnapshot { pets: PetState[]; toy: ToyState | null; pair: PairState | null; time: number; quiet: boolean; treats: TreatState[] }
 export type PetCommand =
   | { type: 'pet' | 'treat' | 'nap' | 'wake' | 'hide' | 'show'; petId: PetId }
   | { type: 'play'; petId: PetId; automatic?: boolean }
   | { type: 'move' | 'drag-start' | 'drag' | 'drag-end'; petId: PetId; point: Point }
   | { type: 'toy-move'; point: Point; held: boolean }
   | { type: 'end-play' }
-  | { type: 'pair'; kind: 'nose_touch' | 'nap' };
+  | { type: 'pair'; kind: 'nose_touch' | 'nap' }
+  /** Local only (overlay gesture to engine); never accepted from IPC. */
+  | { type: 'pet-hold' | 'pet-release'; petId: PetId }
+  /** From the main process menus: walk to a scene point (clipped by validCommand). */
+  | { type: 'come'; petId: PetId; point: Point };
 export interface AtlasFrame { x: number; y: number; w: number; h: number; duration: number }
 export interface AnimationClip { frames: AtlasFrame[]; loop: boolean }
 export interface HitEllipse { x: number; y: number; rx: number; ry: number }

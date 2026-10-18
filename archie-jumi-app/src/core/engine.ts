@@ -38,7 +38,7 @@ export class PetEngine {
       const size = clamp(finite(pref.size, 128), 96, 192);
       const point = this.clampPet({ x: pref.position.x * this.scene.width, y: pref.position.y * this.scene.height }, size);
       return [id, { id, ...point, action: 'idle', actionTime: 0, facing: id === 'archie' ? 'right' : 'left',
-        forcedSleep: false, visible: pref.visible, size, target: null, remaining: this.between(4, 9), movement: null } satisfies RuntimePet];
+        forcedSleep: false, visible: pref.visible, size, target: null, speed: 0, leap: null, held: false, remaining: this.between(4, 9), movement: null } satisfies RuntimePet];
     })) as Record<PetId, RuntimePet>;
     this.nextSocialAt = this.between(35, 70);
     if (carryOver) for (const id of PET_IDS) this.restore(this.pets[id], carryOver.pets?.[id]);
@@ -102,6 +102,8 @@ export class PetEngine {
 
   command(command: PetCommand): void {
     if (command.type === 'end-play') { this.endPlay(); return; }
+    // Phase 2 contract stub: hold-to-pet and come-here behaviour is implemented by the engine work.
+    if (command.type === 'pet-hold' || command.type === 'pet-release' || command.type === 'come') return;
     if (command.type === 'toy-move') {
       if (this.toy && !this.preferences.quiet) {
         const point = this.clampToy(command.point);
@@ -215,9 +217,9 @@ export class PetEngine {
   snapshot(): SceneSnapshot {
     const pets = PET_IDS.map(id => {
       const { remaining: _remaining, movement: _movement, ...pet } = this.pets[id];
-      return { ...pet, target: pet.target ? { ...pet.target } : null };
+      return { ...pet, target: pet.target ? { ...pet.target } : null, leap: pet.leap ? { ...pet.leap } : null };
     });
-    return { pets, toy: this.toy ? { ...this.toy } : null, pair: this.pair ? { ...this.pair } : null, time: this.time, quiet: this.preferences.quiet };
+    return { pets, toy: this.toy ? { ...this.toy } : null, pair: this.pair ? { ...this.pair } : null, time: this.time, quiet: this.preferences.quiet, treats: [] };
   }
 
   positions(): Record<PetId, Point> {
