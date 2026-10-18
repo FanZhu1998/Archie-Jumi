@@ -90,6 +90,8 @@ Adjacent documented behavior that compounds it: Electron's docs now note that "m
 
 If step 2 fixes it instead, the cause is elsewhere (most likely the dropped-report race in 2.4 a). Phase 1 still covers that case, but tell me and I will re-trace before building.
 
+**Outcome, October 18, 2026.** The native experiment did not reproduce hook removal on this PC (Windows 11 build 26200, Electron 44.8). With real 1-pixel cursor moves, forwarding kept working after main-thread stalls of 2.5 s and 6 s, twelve repeated 1.2 s stalls, hide and show of the overlay, recreation of the overlay window, and a GPU process restart. The trigger behind the reported freeze is therefore unconfirmed. Remaining candidates are session transitions (lock, sleep, secure-desktop prompts) and elevated foreground windows, which could not be exercised unattended. Phase 1 ships with polling as the default routing (F8), so hover no longer depends on forwarding under any of these conditions, and the diagnostics log (F7) will record the sequence if the kittens ever stop reacting again. Details are in `archie-jumi-app/docs/VALIDATION.md`.
+
 ### 2.4 Other weaknesses found in the same code paths
 
 a. **No resync.** The renderer sends `input-mode` only when its mode string changes (`lastMode`), while main silently drops reports that arrive during `hidden || paused || quiet` (`src/main/index.ts:160`). A report dropped during a lock transition leaves the two sides disagreeing until the hover target changes again.

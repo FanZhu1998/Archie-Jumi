@@ -1,5 +1,8 @@
 import { PET_IDS } from '../shared/types';
-import type { Action, PairState, PetCommand, PetId, PetState, Point, Preferences, SceneSnapshot, Size, ToyState } from '../shared/types';
+import type { Action, PairState, PetCommand, PetId, PetState, Point, Preferences, SceneSnapshot, ScenePetCarryOver, Size, ToyState } from '../shared/types';
+
+/** Scene state carried from a previous overlay generation (only `pets` is used). */
+export interface EngineCarryOver { pets: Partial<Record<PetId, ScenePetCarryOver>> }
 
 export const PAIR_COOLDOWN = 120;
 export const PLAY_DURATION = 30;
@@ -27,7 +30,7 @@ export class PetEngine {
   private toyOrigin: Point | null = null;
   private toyElapsed = 0;
 
-  constructor(preferences: Preferences, scene: Size, private readonly random: () => number = Math.random) {
+  constructor(preferences: Preferences, scene: Size, private readonly random: () => number = Math.random, carryOver: EngineCarryOver | null = null) {
     this.preferences = copyPreferences(preferences);
     this.scene = this.validScene(scene);
     this.pets = Object.fromEntries(PET_IDS.map(id => {
@@ -38,7 +41,23 @@ export class PetEngine {
         forcedSleep: false, visible: pref.visible, size, target: null, remaining: this.between(4, 9), movement: null } satisfies RuntimePet];
     })) as Record<PetId, RuntimePet>;
     this.nextSocialAt = this.between(35, 70);
+    if (carryOver) for (const id of PET_IDS) this.restore(this.pets[id], carryOver.pets?.[id]);
     if (preferences.quiet) this.enterQuiet();
+  }
+
+  /**
+   * Restores what a recreated overlay should keep: facing, a requested nap, or an ordinary nap
+   * with a fresh duration. Everything else starts from the usual defaults; quiet mode still wins.
+   */
+  private restore(pet: RuntimePet, saved: ScenePetCarryOver | undefined): void {
+    if (!saved) return;
+    if (saved.facing === 'left' || saved.facing === 'right') pet.facing = saved.facing;
+    if (saved.forcedSleep === true) {
+      pet.forcedSleep = true;
+      this.act(pet, 'sleep', Infinity);
+    } else if (saved.action === 'sleep') {
+      this.act(pet, 'sleep', this.between(18, 42));
+    }
   }
 
   /** The caller pauses stepping while hidden. Large resume gaps never cause catch-up behavior. */

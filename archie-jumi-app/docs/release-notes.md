@@ -1,8 +1,62 @@
-# Archie & Jumi — realistic appearance update
+# Archie & Jumi — release notes
 
-Version **1.0.1** · Windows 11 x64 · October 17, 2026
+## 1.0.2 — kittens keep reacting
 
-## What changed
+Windows 11 x64 · October 18, 2026
+
+### What changed
+
+**Hover no longer depends on Windows mouse forwarding.** In 1.0.1 the click-through overlay learned where the cursor was only from Electron's mouse forwarding, a process-wide low-level mouse hook. When that path stopped delivering mouse moves, nothing could make the kittens clickable again. In 1.0.2 the main process reads the cursor position about 30 times a second and tells the scene only while the cursor is near a kitten or the yarn. No global mouse hook is installed by default.
+
+- On this PC the kittens became clickable within 21 ms of the cursor reaching them, the worst of fifteen samples over three runs, and turned click-through again within a few milliseconds of it leaving.
+- One decision in the main process now controls whether the overlay accepts clicks. If its own cursor reading has been away from every kitten for 300 ms, the overlay turns click-through even if the scene still reports a hover. A stale report therefore cannot leave the whole screen swallowing clicks.
+- The scene resends its input state every second. The main process re-applies it after hide, show, lock, unlock, sleep, resume, Quiet Mode and display changes.
+- A drag whose button release was never seen now ends on the next mouse move.
+
+**Automatic recovery.** A crashed, hung or stalled scene, a lost graphics process, or a scene that fails to start is rebuilt automatically. The kittens keep their places, facing and naps. Up to three rebuilds in ten minutes happen without any action. After that the kittens stay hidden with a notice until Show All, and a hung scene is shut down so it cannot keep using the processor. In 1.0.1 every failure hid the kittens until Show All.
+
+**Fewer interruptions.** Display events now rebuild the scene only when the kittens' monitor really changed its size, position or scale. 1.0.1 rebuilt it on any change to any monitor, including one at every startup. If the browser engine stops delivering animation frames, for example because it wrongly treats the window as covered, timers keep the scene animating. Chromium's native occlusion tracking is now off for the same reason; it made no measurable difference to resource use.
+
+**Copy diagnostics.** Settings → A place on your desktop → Copy diagnostics copies a short local log to the clipboard. It lists versions, input routing, display count and scale factors, and recent input, recovery, power and display events. The log is kept in the app data folder as `diagnostics.log` and rotated at 256 KB. It holds no cursor positions, window titles or file names, and nothing leaves the computer.
+
+**Troubleshooting switches.** `--input-routing=hybrid` adds 1.0.1-style forwarding on top of polling and re-arms it automatically. `--native-occlusion` turns Chromium's occlusion tracking back on. README → Troubleshooting explains how to pass them to the installed app.
+
+### About the "stops reacting after a while" bug
+
+The upgrade plan named its most likely cause: Windows silently removing Electron's mouse hook after Electron's main thread stalls. A native experiment on this PC did not reproduce that. On Windows 11 build 26200 with Electron 44.8, real 1-pixel cursor moves kept being forwarded after each of these:
+
+- main-thread stalls of 2.5 s and 6 s, and twelve repeated stalls of 1.2 s, with cursor moves during every stall
+- hiding and showing the overlay, which 1.0.1 did on every lock and unlock
+- destroying and recreating the overlay window, which 1.0.1 did on every display event
+- a killed and restarted GPU process
+
+The exact trigger on this PC is therefore still unknown. Reports from other projects describe low-level hooks dying after session transitions such as lock, sleep or a secure-desktop prompt, and Electron documents that forwarding pauses while an elevated window is in front. Those could not be exercised unattended. 1.0.2 does not use the forwarding path by default, so none of them can stop the kittens from noticing the cursor. If the kittens ever stop reacting again, use Copy diagnostics before restarting the app; the log will show what happened.
+
+The opt-in check `node scripts/run-electron.mjs . --smoke-test --hook-loss-check`, run after a build, repeats the stall experiment. It sends only 1-pixel cursor moves, never clicks, and restores the cursor position.
+
+### Validation and resource use
+
+TypeScript, 256 unit tests in 17 files, the browser UI check in Chrome and Edge, and the native smoke test with 37 required checks passed. The native test covers hover through the cursor feed, hover latency, the hover guard, drag capture and release, a missed button release, lock and unlock, hybrid re-arming, display changes with and without real metric changes, a starved frame loop, a hung scene, a crash, a lost graphics process, the recovery budget and Show All, and settings-only diagnostics. See `VALIDATION.md`.
+
+A short native benchmark on this Windows 11 / Ryzen 5 5500U machine, with Settings closed, measured:
+
+| State | 1.0.1 CPU | 1.0.2 CPU | 1.0.2 combined working set |
+| --- | ---: | ---: | ---: |
+| Resting/sleeping | 0.49% | 0.60% | 342 MiB |
+| Automatic yarn play | 1.59% | 1.84% | 365 MiB |
+| Hidden | 0.03% | 0.10% | 357 MiB |
+
+CPU is a share of total system capacity. Each phase lasted about eight seconds. These are measurements on this machine, not guarantees. With `--native-occlusion` the figures were the same within noise.
+
+### Remaining acceptance work
+
+Checks with a physical mouse remain to be done: clicks, scrolling and dragging through empty space, and hovering, petting and dragging the kittens. Real lock, unlock and sleep cycles, an eight-hour soak with diagnostics, monitor unplug and reconnect, 100% and 200% scaling, and an upgrade install over 1.0.1 are also still open. The right 150% monitor still reports an overlay three DIP taller than its work area. The scene uses the work area, and the difference is now logged.
+
+## 1.0.1 — realistic appearance update
+
+Windows 11 x64 · October 17, 2026
+
+### What changed
 
 The profile cards, desktop kitten sprites and application icon now use realistic artwork based on the supplied photos. Archie retains his gray tabby coat, white facial blaze, muzzle, chest and paws. Jumi retains the orange tabby coat, cream muzzle and light paw tips.
 
@@ -10,7 +64,7 @@ The profile cards use static transparent portraits with neutral backgrounds. Car
 
 The artwork was created with the built-in imagegen tool using the supplied photographs. It is a generated interpretation, not an unchanged photograph. Unseen markings and body details are reconstructed. The original photos are not bundled, and the installed app operates offline without uploading images.
 
-## Artwork details and limits
+### Artwork details and limits
 
 - Sixteen supplied poses per kitten, mapped to thirteen actions in both directions.
 - Idle/blinking, walking and trotting use multiple poses. The other ten actions hold a distinct pose; they are not fully animated multi-frame sequences.
@@ -21,7 +75,7 @@ The artwork was created with the built-in imagegen tool using the supplied photo
 
 Source sheets, crop metadata, the local packing script and the generation prompts are included in the source archive. `npm run art` repacks those assets locally; it does not call an image service. The earlier vector generator is retained only as an explicitly named legacy tool.
 
-## Install or develop
+### Install or develop
 
 Run `ArchieJumiSetup.exe` for the updated personal Windows build. It uses the same application identity as 1.0.0. The installer remains unsigned. This task built and tested the packaged executable but did not install it into your account.
 
@@ -29,7 +83,7 @@ For source development, extract `archie-and-jumi-source.zip`, open `archie-jumi-
 
 Sound and launch at login are off initially. Closing Settings leaves the pets and tray running. Use the tray to Quit, or Ctrl+Alt+Shift+P to hide/show them. Change the shortcut in Settings if it conflicts with another app.
 
-## Validation and resource use
+### Validation and resource use
 
 TypeScript, all **103 automated tests**, browser UI checks and the final packaged native smoke assertions passed. The native test checked alpha-hit input mode, drag capture/release, stationary-pointer encounters, Quiet Mode, hide/show, all three monitor selections and recovery after an intentional renderer crash. See `VALIDATION.md` for scope.
 
@@ -43,7 +97,7 @@ A short native benchmark on this Windows 11 / Ryzen 5 5500U machine, with Settin
 
 Play rendered at approximately 30 FPS; hidden mode produced zero sprite draws. Each phase lasted about five seconds. Working-set sums can count shared memory more than once. These are measurements on this machine, not performance guarantees. The separate capture-heavy native test with Settings open reached about 588 MiB, so the 500 MiB target is not established for every condition.
 
-## Remaining acceptance work
+### Remaining acceptance work
 
 Physical mouse passthrough, typing focus, monitor unplug/reconnect, power/lock/fullscreen behavior, 100% and 200% native DPI checks, clean-account installation/upgrade/uninstall and long-duration resource testing remain to be performed. GPU usage and input latency were not measured.
 

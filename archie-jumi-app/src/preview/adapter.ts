@@ -52,7 +52,7 @@ export function createPreviewAdapter(options: { scene?: Size; version?: string }
     preferences: structuredClone(preferences),
     displays: [{ id: 'preview', label: 'Browser playground', width: scene.width, height: scene.height, scaleFactor: window.devicePixelRatio || 1, primary: true }],
     scene: { ...scene }, generation, hidden, paused: hidden, cursor: null,
-    notices: [...notices], version: options.version ?? '1.0.0-preview',
+    notices: [...notices], version: options.version ?? '1.0.0-preview', carryOver: null, scriptedCursor: false,
   });
   const notify = () => { const state = bootstrap(); bootstrapListeners.forEach(callback => callback(state)); };
   const post = (message: Message) => { try { channel?.postMessage(message); } catch { /* A closed preview tab must not stop the companion. */ } };
@@ -136,6 +136,8 @@ export function createPreviewAdapter(options: { scene?: Size; version?: string }
   window.addEventListener('pagehide', () => channel?.close(), { once: true });
 
   return {
+    // No main process: the overlay trusts real pointer events and there is no cursor feed.
+    cursorFeed: false,
     getBootstrap: async () => bootstrap(),
     savePreferences: async patch => {
       preferences = normalizePreferences(patch, preferences);
@@ -148,6 +150,8 @@ export function createPreviewAdapter(options: { scene?: Size; version?: string }
     setInputMode: () => {},
     ready: () => { notify(); if (!settingsView) postRuntime(); },
     heartbeat: () => {},
+    setInterest: () => {},
+    reportScene: () => {},
     savePositions: (positions: Record<PetId, Point>) => {
       for (const id of ['archie', 'jumi'] as const) {
         preferences.pets[id].position = { x: clamp(positions[id]?.x, preferences.pets[id].position.x, 0, 1), y: clamp(positions[id]?.y, preferences.pets[id].position.y, 0, 1) };
@@ -166,8 +170,10 @@ export function createPreviewAdapter(options: { scene?: Size; version?: string }
       persistRuntime();
       postRuntime();
     },
+    copyDiagnostics: async () => ({ ok: false, message: 'Diagnostics are available in the desktop app.' }),
     onBootstrap: callback => { bootstrapListeners.add(callback); return () => bootstrapListeners.delete(callback); },
     onCommand: callback => { commandListeners.add(callback); return () => commandListeners.delete(callback); },
     onLifecycle: callback => { lifecycleListeners.add(callback); return () => lifecycleListeners.delete(callback); },
+    onCursor: () => () => {},
   };
 }

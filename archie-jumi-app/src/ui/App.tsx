@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import type { Bootstrap, DesktopAdapter, Personality, PetCommand, PetId, PetPreferences, Preferences } from '../shared/types';
 import { createPreviewAdapter } from '../preview/adapter';
 import { PetPortrait } from './PetPortrait';
+import { errorAfterCopySuccess } from './copy-feedback';
 import './styles.css';
 
 let fallbackAdapter: DesktopAdapter | undefined;
@@ -91,6 +92,9 @@ export function App({ adapter: provided }: { adapter?: DesktopAdapter }) {
   const [toast, setToast] = useState('');
   const [shortcut, setShortcut] = useState('');
   const [shortcutDirty, setShortcutDirty] = useState(false);
+  const [copyingDiagnostics, setCopyingDiagnostics] = useState(false);
+  // The error a failed diagnostics copy put up, so that a later successful copy clears only that one.
+  const copyFailure = useRef('');
   const preview = !window.desktop;
 
   const accept = (next: Bootstrap) => {
@@ -130,6 +134,21 @@ export function App({ adapter: provided }: { adapter?: DesktopAdapter }) {
     save({ pets: { ...preferences.pets, [id]: { ...preferences.pets[id], ...patch } } });
   };
   const command = (value: PetCommand, message: string) => { adapter.sendCommand(value); setToast(message); };
+  const copyDiagnostics = () => {
+    setCopyingDiagnostics(true);
+    const failed = (message: string) => { copyFailure.current = message; setError(message); };
+    void adapter.copyDiagnostics()
+      // A failure is shown as an error, never next to the toast's check mark. A later success clears
+      // that error, but never an unrelated one such as a failed save.
+      .then(result => {
+        if (!result.ok) { failed(result.message); return; }
+        const previous = copyFailure.current;
+        copyFailure.current = '';
+        setError(current => errorAfterCopySuccess(current, previous));
+        setToast(result.message);
+      }, () => failed('Diagnostics could not be copied. Please try again.'))
+      .finally(() => setCopyingDiagnostics(false));
+  };
   const move = (id: PetId, dx: number, dy: number) => {
     const current = stateRef.current;
     if (!current) return;
@@ -167,6 +186,10 @@ export function App({ adapter: provided }: { adapter?: DesktopAdapter }) {
         <label className="field-label">Their screen<select value={preferences.selectedDisplay ?? state.displays.find(display => display.primary)?.id ?? state.displays[0]?.id ?? ''} onChange={event => save({ selectedDisplay: event.target.value })}>{state.displays.map(display => <option key={display.id} value={display.id}>{display.label}{display.primary && !preview ? ' · Primary' : ''}</option>)}</select><span className="control-hint">Both kittens stay together on the selected screen.</span></label>
         <form className="shortcut-form" onSubmit={event => { event.preventDefault(); if (!shortcut.trim()) { setError('Enter a keyboard shortcut before saving.'); return; } save({ shortcut: shortcut.trim() }); setShortcutDirty(false); setToast('Hide / show shortcut saved.'); }}><label className="field-label" htmlFor="visibility-shortcut">Hide / show shortcut</label><div className="shortcut-input"><input id="visibility-shortcut" value={shortcut} onChange={event => { setShortcut(event.target.value); setShortcutDirty(true); }} disabled={preview} spellCheck={false} autoComplete="off" aria-describedby="shortcut-hint" /><button className="small-button" disabled={preview || !shortcutDirty} type="submit">Save</button></div><span className="control-hint" id="shortcut-hint">{preview ? 'Global shortcuts are available in the desktop app.' : 'For example: Control+Alt+Shift+P. Use a combination other apps do not use.'}</span></form>
         <Toggle checked={preferences.launchAtLogin} onChange={launchAtLogin => save({ launchAtLogin })} label="Start the day together" description="Launch when you sign in to Windows." disabled={preview} />
+        <div className="diagnostics-row">
+          <span className="toggle-copy"><span className="control-label">Troubleshooting</span><span className="control-hint">A short local log for troubleshooting. Nothing is sent anywhere.</span></span>
+          <button className="secondary-button" type="button" onClick={copyDiagnostics} disabled={preview || copyingDiagnostics}>Copy diagnostics</button>
+        </div>
       </div></section>
     </div>
     <footer className="app-footer"><span><Icon name="heart" />Made for Archie & Jumi. No chores. Just company.</span><span>Saved on this device <span className="footer-dot">·</span> v{state.version}</span></footer>

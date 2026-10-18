@@ -1,10 +1,15 @@
 /**
  * Screenshot-free native Electron benchmark. Run after `npm run build`:
- *   node scripts/benchmark.mjs [--seconds=5] [--output=test-results/performance.json]
+ *   node scripts/benchmark.mjs [--seconds=5] [--output=test-results/performance.json] [--app-arg=<flag>]...
+ *
+ * `--app-arg` (repeatable) passes a switch to the app, for example the plan F6 comparison:
+ *   node scripts/benchmark.mjs --output=test-results/performance-native-occlusion.json --app-arg=--native-occlusion
+ * The report's method.appArgs and environment.appSwitches record what each run used.
  *
  * Uses an isolated temporary app profile, never your real preferences. Does not
  * install, register launch-at-login, or alter the app source. A visible transparent
- * pet overlay is necessary to measure its real compositor cost.
+ * pet overlay is necessary to measure its real compositor cost. Hover latency is not
+ * sampled here (there is no scripted cursor); the smoke report records hoverLatencyMs.
  */
 import { _electron as electron } from 'playwright-core';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -16,6 +21,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const seconds = Number(process.argv.find(argument => argument.startsWith('--seconds='))?.split('=')[1] ?? 5);
 if (!Number.isFinite(seconds) || seconds < 3 || seconds > 30) throw new Error('--seconds must be between 3 and 30.');
 const outputArgument = process.argv.find(argument => argument.startsWith('--output='))?.slice('--output='.length);
+const appArgs = process.argv.filter(argument => argument.startsWith('--app-arg=')).map(argument => argument.slice('--app-arg='.length));
+for (const flag of appArgs) if (!/^--[\w-]+(=[\w.-]+)?$/.test(flag)) throw new Error(`--app-arg expects one app switch such as --native-occlusion, not "${flag}".`);
+// Some hosts (for example editor extension processes) export ELECTRON_RUN_AS_NODE=1, which makes
+// Electron run as plain Node; Playwright passes the environment through unchanged.
+const env = { ...process.env };
+delete env.ELECTRON_RUN_AS_NODE;
 const output = resolve(root, outputArgument ?? 'test-results/performance.json');
 const results = join(root, 'test-results');
 await mkdir(results, { recursive: true });
@@ -42,6 +53,7 @@ const report = {
   method: {
     sampleDurationSeconds: seconds,
     sampleIntervalSeconds: 1,
+    appArgs,
     screenshotsTaken: false,
     settingsOpened: false,
     isolatedProfile: profile,
@@ -60,9 +72,11 @@ let application;
 let applicationClosed = false;
 try {
   application = await electron.launch({
-    args: [wrapper, '--start-hidden-panel'],
+    // The app reads its switches from process.argv when main.cjs loads, after the wrapper.
+    args: [wrapper, '--start-hidden-panel', ...appArgs],
     executablePath: join(root, 'node_modules', 'electron', 'dist', platform() === 'win32' ? 'electron.exe' : 'electron'),
     cwd: root,
+    env,
     timeout: 30_000,
   });
   application.on('close', () => { applicationClosed = true; });
@@ -147,6 +161,12 @@ try {
   });
   const environment = await application.evaluate(({ app, BrowserWindow, screen }) => ({
     versions: process.versions,
+    // What the app actually ran with: native occlusion is disabled unless --native-occlusion was passed.
+    appSwitches: {
+      nativeOcclusion: process.argv.includes('--native-occlusion'),
+      inputRouting: process.argv.includes('--input-routing=hybrid') ? 'hybrid' : 'polling',
+      disableFeatures: app.commandLine.getSwitchValue('disable-features'),
+    },
     gpuFeatureStatus: app.getGPUFeatureStatus(),
     displays: screen.getAllDisplays().map(display => ({ id: display.id, workArea: display.workArea, scaleFactor: display.scaleFactor, primary: display.id === screen.getPrimaryDisplay().id })),
     windows: BrowserWindow.getAllWindows().map(window => ({ url: window.webContents.getURL(), bounds: window.getBounds(), visible: window.isVisible(), focusable: window.isFocusable() })),

@@ -10,7 +10,27 @@ export interface PetPreferences { name: string; visible: boolean; size: number; 
 export interface Preferences { sound: boolean; volume: number; reducedMotion: boolean; quiet: boolean; launchAtLogin: boolean; shortcut: string; selectedDisplay: string | null; pets: Record<PetId, PetPreferences> }
 export interface SavedState { schemaVersion: 1; preferences: Preferences }
 export interface DisplayInfo { id: string; label: string; width: number; height: number; scaleFactor: number; primary: boolean }
-export interface Bootstrap { preferences: Preferences; displays: DisplayInfo[]; scene: Size; generation: number; hidden: boolean; paused: boolean; cursor: Point | null; notices: string[]; version: string }
+export interface Bootstrap {
+  preferences: Preferences; displays: DisplayInfo[]; scene: Size; generation: number; hidden: boolean; paused: boolean; cursor: Point | null; notices: string[]; version: string; carryOver: SceneCarryOver | null;
+  /** Smoke tests only: main scripts the cursor, so hover follows the cursor feed alone and real pointer events never influence it. */
+  scriptedCursor: boolean;
+}
+/** Scene DIP rectangle (also used for interest regions). */
+export interface Rect { x: number; y: number; width: number; height: number }
+export type InputTarget = PetId | 'toy' | null;
+export interface InputModePayload { generation: number; target: InputTarget; capture: boolean }
+/** Sent every second: `frames` counts frame-loop ticks since the previous beat; target/capture resync the input report. */
+export interface HeartbeatPayload extends InputModePayload { frames: number }
+/** Where the renderer wants to be told about the cursor (inflated sprite and toy rectangles). */
+export interface InterestPayload { generation: number; rects: Rect[] }
+/** Main-process cursor feed: the cursor in scene DIP while it is inside the interest region, then one `inside: false`. */
+export type CursorFeedMessage =
+  | { generation: number; inside: true; x: number; y: number }
+  | { generation: number; inside: false };
+export interface ScenePetCarryOver { action: Action; facing: Facing; forcedSleep: boolean }
+/** The last scene state a renderer reported, restored by the next overlay generation. */
+export interface SceneCarryOver { generation: number; pets: Record<PetId, ScenePetCarryOver> }
+export interface DiagnosticsResult { ok: boolean; message: string; entries?: number }
 export interface PetState { id: PetId; x: number; y: number; action: Action; actionTime: number; facing: Facing; forcedSleep: boolean; visible: boolean; size: number; target: Point | null }
 export interface ToyState extends Point { petId: PetId; remaining: number; automatic: boolean; held: boolean }
 export interface PairState { kind: 'nose_touch' | 'nap'; phase: 'approach' | 'together'; elapsed: number }
@@ -28,17 +48,23 @@ export interface HitEllipse { x: number; y: number; rx: number; ry: number }
 export interface AnimationPack { formatVersion: 1; id: PetId; name: string; atlas: string; frameWidth: number; frameHeight: number; anchor: Point; hitShapes: HitEllipse[]; animations: Record<Action, Record<Facing, AnimationClip>>; attribution: string; pages?: Partial<Record<Action, { file: string; offsetX: number; offsetY: number }>> }
 export type Lifecycle = { type: 'pause' | 'resume' | 'cancel-input'; cursor?: Point | null };
 export interface DesktopAdapter {
+  /** True when the main process feeds the cursor position (desktop app); the browser preview has no feed. */
+  readonly cursorFeed: boolean;
   getBootstrap(): Promise<Bootstrap>;
   savePreferences(patch: Partial<Preferences>): Promise<Bootstrap>;
   sendCommand(command: PetCommand): void;
-  setInputMode(payload: { generation: number; target: PetId | 'toy' | null; capture: boolean }): void;
+  setInputMode(payload: InputModePayload): void;
   ready(generation: number): void;
-  heartbeat(generation: number): void;
+  heartbeat(payload: HeartbeatPayload): void;
+  setInterest(payload: InterestPayload): void;
+  reportScene(payload: SceneCarryOver): void;
   savePositions(positions: Record<PetId, Point>): void;
   showPetMenu(petId: PetId): void;
   action(action: 'toggle-hidden' | 'show' | 'hide' | 'settings' | 'quit'): void;
+  copyDiagnostics(): Promise<DiagnosticsResult>;
   onBootstrap(callback: (state: Bootstrap) => void): () => void;
   onCommand(callback: (command: PetCommand) => void): () => void;
   onLifecycle(callback: (event: Lifecycle) => void): () => void;
+  onCursor(callback: (message: CursorFeedMessage) => void): () => void;
 }
 declare global { interface Window { desktop?: DesktopAdapter } }

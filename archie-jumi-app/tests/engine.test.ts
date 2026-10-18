@@ -293,3 +293,63 @@ describe('pointer gesture threshold', () => {
     expect(gesture.end()).toBe('inactive');
   });
 });
+
+describe('scene carry-over from a previous overlay', () => {
+  const carry = (archie: Partial<{ action: string; facing: string; forcedSleep: boolean }>, jumi?: Partial<{ action: string; facing: string; forcedSleep: boolean }>) => ({
+    pets: {
+      archie: { action: 'idle', facing: 'right', forcedSleep: false, ...archie },
+      ...(jumi ? { jumi: { action: 'idle', facing: 'left', forcedSleep: false, ...jumi } } : {}),
+    },
+  }) as unknown as ConstructorParameters<typeof PetEngine>[3];
+  const restored = (value: ConstructorParameters<typeof PetEngine>[3], preferences = preferencesWithoutSocial()) => new PetEngine(preferences, scene, () => 0.5, value);
+
+  it('restores facing', () => {
+    const engine = restored(carry({ facing: 'left' }, { facing: 'right' }));
+    expect(pet(engine)).toMatchObject({ facing: 'left', action: 'idle' });
+    expect(pet(engine, 'jumi')).toMatchObject({ facing: 'right', action: 'idle' });
+  });
+
+  it('restores a requested nap as an indefinite forced sleep', () => {
+    const engine = restored(carry({ action: 'sleep', forcedSleep: true }));
+    expect(pet(engine)).toMatchObject({ action: 'sleep', forcedSleep: true });
+    step(engine, 240);
+    expect(pet(engine)).toMatchObject({ action: 'sleep', forcedSleep: true });
+    engine.command({ type: 'pet', petId: 'archie' });
+    expect(pet(engine)).toMatchObject({ action: 'pet', forcedSleep: false });
+  });
+
+  it('restores an ordinary nap with a fresh duration, then wakes', () => {
+    const engine = restored(carry({ action: 'sleep' }));
+    expect(pet(engine)).toMatchObject({ action: 'sleep', forcedSleep: false, actionTime: 0 });
+    step(engine, 29.9);
+    expect(pet(engine).action).toBe('sleep');
+    step(engine, 0.3);
+    expect(pet(engine).action).toBe('wake');
+  });
+
+  it.each(['walk', 'trot', 'carried', 'pet', 'eat', 'pounce', 'land', 'nose_touch', 'groom'])('starts %s from the usual defaults', action => {
+    const engine = restored(carry({ action }));
+    expect(pet(engine)).toMatchObject({ action: 'idle', forcedSleep: false, target: null, actionTime: 0 });
+  });
+
+  it('lets quiet mode win over a restored nap, which returns when quiet mode ends', () => {
+    const preferences = preferencesWithoutSocial();
+    preferences.quiet = true;
+    const engine = restored(carry({ action: 'sleep', forcedSleep: true }), preferences);
+    expect(pet(engine)).toMatchObject({ action: 'walk', forcedSleep: true });
+    step(engine, 15);
+    expect(pet(engine).action).toBe('sit');
+    preferences.quiet = false;
+    engine.setPreferences(preferences);
+    expect(pet(engine)).toMatchObject({ action: 'sleep', forcedSleep: true });
+  });
+
+  it('behaves exactly like a fresh engine without carry-over and restores only listed kittens', () => {
+    const plain = new PetEngine(defaultPreferences(), scene, seeded(7));
+    const empty = new PetEngine(defaultPreferences(), scene, seeded(7), null);
+    step(plain, 60); step(empty, 60);
+    expect(empty.snapshot()).toEqual(plain.snapshot());
+    const partial = restored(carry({ facing: 'left' }));
+    expect(pet(partial, 'jumi')).toMatchObject({ facing: 'left', action: 'idle' });
+  });
+});

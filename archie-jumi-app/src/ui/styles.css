@@ -149,6 +149,8 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 9px; border-radius: 
 .shortcut-form { padding: 15px 0 13px; border-bottom: 1px solid #f3eef4; }
 .shortcut-input { display: flex; gap: 6px; margin-top: 7px; }
 .shortcut-input input { min-width: 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 9px; }
+.diagnostics-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 15px 0; border-top: 1px solid #f3eef4; }
+.diagnostics-row .secondary-button { padding: 7px 10px; font-size: 9px; }
 .small-button { background: #eee6f4; border-radius: 7px; color: #9681a6; font-size: 9px; padding: 7px 10px; }
 .small-button:hover:not(:disabled) { background: #e1d4eb; }
 .app-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid #e9e2eb; margin-top: 28px; padding: 18px 1px 2px; color: #b3a9b7; font-size: 8px; }

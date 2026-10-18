@@ -138,6 +138,25 @@ describe('browser preview adapter', () => {
     expect(commands).toEqual([{ type: 'move', petId: 'archie', point: { x: 0, y: 800 } }]);
   });
 
+  it('implements the desktop-only bridge members as safe no-ops', async () => {
+    const adapter = createPreviewAdapter();
+    const bootstrap = vi.fn();
+    adapter.onBootstrap(bootstrap);
+    expect(adapter.cursorFeed).toBe(false);
+    expect((await adapter.getBootstrap()).carryOver).toBeNull();
+    expect((await adapter.getBootstrap()).scriptedCursor).toBe(false);
+    expect(() => adapter.setInterest({ generation: 1, rects: [{ x: 0, y: 0, width: 10, height: 10 }] })).not.toThrow();
+    expect(() => adapter.reportScene({ generation: 1, pets: { archie: { action: 'sleep', facing: 'left', forcedSleep: true }, jumi: { action: 'sit', facing: 'right', forcedSleep: false } } })).not.toThrow();
+    expect(() => adapter.heartbeat({ generation: 1, frames: 30, target: 'archie', capture: false })).not.toThrow();
+    const cursor = vi.fn();
+    const unsubscribe = adapter.onCursor(cursor);
+    expect(typeof unsubscribe).toBe('function');
+    expect(() => unsubscribe()).not.toThrow();
+    expect(cursor).not.toHaveBeenCalled();
+    expect(bootstrap).not.toHaveBeenCalled();
+    await expect(adapter.copyDiagnostics()).resolves.toEqual({ ok: false, message: 'Diagnostics are available in the desktop app.' });
+  });
+
   it('saves normalized positions and supports listener cleanup', async () => {
     const adapter = createPreviewAdapter();
     const listener = vi.fn();

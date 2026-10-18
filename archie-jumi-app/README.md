@@ -24,6 +24,15 @@ If npm asks about build scripts, approve the installed Electron/build-tool scrip
 
 Both kittens stay on the selected monitor. The app does not inspect windows, take desktop screenshots, record keyboard input or access online services during ordinary use. The developer smoke test captures only the app's own windows when explicitly invoked.
 
+## Troubleshooting
+
+- **Copy diagnostics** (Settings → A place on your desktop) copies a short local log to the clipboard for a bug report: versions, input routing, display count and scale factors, and recent input and recovery events. The log is kept locally as `diagnostics.log` (plus one older `diagnostics.1.log`) in the app's data folder; nothing is sent anywhere. If another program is holding the clipboard, the app says so instead of copying; try again.
+- The app finds the cursor by polling it, without a global mouse hook. If hover ever misbehaves, start it with `--input-routing=hybrid` to add Windows mouse forwarding as well; the app re-arms it automatically.
+  1. Quit Archie & Jumi from the tray first. Starting it again while it runs only opens Settings and keeps the current mode.
+  2. From source: `npm start -- --input-routing=hybrid`. Installed app: run `"%LocalAppData%\archie_jumi\archie-jumi.exe" --input-routing=hybrid` (for example from Win+R), or append ` --input-routing=hybrid` to the Target of the Start-menu shortcut, which points at that file.
+  3. Copy diagnostics then shows `input routing hybrid`. Launch at login starts without the flag, and installing or upgrading recreates the shortcut without it.
+- Chromium's native window occlusion tracking is off so covered kittens keep animating. `--native-occlusion`, passed the same way after quitting from the tray, turns it back on; Copy diagnostics then shows `native occlusion enabled`.
+
 ## Development and checks
 
 ```powershell
