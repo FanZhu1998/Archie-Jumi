@@ -15,14 +15,21 @@ If npm asks about build scripts, approve the installed Electron/build-tool scrip
 
 ## Controls
 
-- Click to pet; drag more than six logical pixels to carry and reposition.
-- Right-click a kitten for treats, yarn, naps, waking and hiding.
+- Click a kitten for a short pet. Press and hold without moving (about a third of a second) for a longer pet: hearts keep rising and, with Little sounds on, a soft purr loops until you let go, for up to 8 seconds.
+- Drag more than six logical pixels to carry a kitten and put it down somewhere else. It swings a little with the drag, its shadow stays on the ground, and it lands with a small squash and a puff of dust. A drag that starts after a hold is still a drag.
+- Right-click a kitten, or open its submenu in the tray, for Come here, treats, yarn, naps, waking and hiding:
+  - **Come here** walks the kitten to a spot you point at, and it sits there for a while. From a kitten's own menu, choose it, then move the pointer to the spot and hold it still for a moment (within six seconds). From the tray, the kitten walks to where the pointer last rested on the desktop before you went to the tray.
+  - **Give a treat** drops a treat just ahead of the kitten. It bounces once, the kitten walks over and eats it, and a few crumbs are left for a moment.
+  - **Play with yarn** puts the ball in front of the kitten, which chases it, crouches and pounces. You can pick the ball up and move it; when you let go it bounces. In **Automatic yarn play** the ball rolls between random spots near where play started, and a pounce can bat it away.
+- **Curious about the cursor** (on by default, in Settings under Your calm corner): rest the cursor near an idle, sitting or grooming kitten for about two and a half seconds and it turns to look. Sometimes it wanders over and sits next to it. Each kitten then ignores the cursor for a minute and a half to three minutes. Curiosity never makes the window catch clicks: away from the kittens themselves, clicks still reach the apps underneath.
+- The personality sliders shape all of this: playful kittens pounce, bat the yarn and trot more often and are more likely to wander over to the cursor; sociable ones seek each other out more and also wander over to the cursor more; energetic ones wander more, sleep less and walk faster.
 - Use the tray menu or Ctrl+Alt+Shift+P to hide/show all companions.
-- Quiet Mode moves the kittens near the bottom and makes the complete overlay click-through.
+- Quiet Mode moves the kittens near the bottom and makes the complete overlay click-through; nothing new happens while it is on.
+- Gentler motion keeps the kittens from roaming or leaping and turns off the procedural motion (breathing, walking bob and lean, turns, squash and stretch, crossfades) and the particles; feedback stays as simple static glyphs. Treats appear right at the kitten's paws, and Come here moves the kitten at once.
 - The control panel offers keyboard-accessible actions, automatic yarn play and directional reposition buttons.
 - Sound and launch at login are off initially. Login launch is available only in the installed app.
 
-Both kittens stay on the selected monitor. The app does not inspect windows, take desktop screenshots, record keyboard input or access online services during ordinary use. The developer smoke test captures only the app's own windows when explicitly invoked.
+Both kittens stay on the selected monitor. The app does not inspect windows, take desktop screenshots, record keyboard input or access online services during ordinary use. Cursor curiosity uses the cursor position only near the kittens and only in memory; it is never saved or sent anywhere. The developer smoke test captures only the app's own windows when explicitly invoked.
 
 ## Troubleshooting
 
@@ -45,14 +52,16 @@ npm run make
 
 `npm run preview` serves a browser-only control-panel preview. It cannot implement native click-through or tray controls. Open `?view=overlay` on the preview server to inspect animations; preview tabs share local preferences and commands.
 
-`npm run smoke` uses an isolated local test profile, captures the app's own windows and writes a report to `test-results/`. It does not certify all monitor, full-screen, DPI, real-pointer or installation scenarios.
+`npm run smoke` uses an isolated local test profile, captures the app's own windows and writes a report to `test-results/`. It drives hover with a scripted cursor and also checks hold-to-pet, Come here, the treat flow, cursor curiosity and the curious toggle, and hover on a walking, turning kitten. For visual review it saves `motion-play.png`, `motion-pounce.png`, `motion-treat.png` and `motion-held-pet.png` next to the report. It does not certify all monitor, full-screen, DPI, real-pointer or installation scenarios.
+
+`node tests/ui-browser.ts` runs the control panel and the browser playground in a headless browser (Chrome by default; set `UI_TEST_BROWSER=msedge` to use Edge). It covers the settings, including the curious toggle, and a real-mouse hold-to-pet in the playground.
 
 The Windows installer is produced under `out/make/squirrel.windows/x64/`. It is a personal unsigned build, with manual updates. Signing and automatic updates are future distribution work.
 
 ## Architecture
 
-- `src/core`: deterministic behavior engine and pointer gestures; independent of Electron and the DOM.
-- `src/rendering`: Canvas scene, sprite validation/alpha hit masks and synthesized optional purr.
+- `src/core`: deterministic behavior engine, pointer gestures (click, hold, drag), procedural motion poses and analytic particle effects; independent of Electron and the DOM.
+- `src/rendering`: Canvas scene, sprite validation and alpha hit masks (exact under the motion transforms), effects layers, hold-to-pet wiring and the synthesized optional purr (one-shot for a click, a loop for a hold).
 - `src/main`: native windows, tray, validated IPC, lifecycle recovery and versioned atomic storage.
 - `src/shared`: contracts, defaults and validation.
 - `src/ui`: accessible React control panel.

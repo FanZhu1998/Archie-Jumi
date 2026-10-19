@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { ACTIONS, PET_IDS, type AnimationPack } from '../src/shared/types';
-import { alphaHit, animationFrame, frameKey, validatePack } from '../src/rendering/assets';
+import { alphaHit, animationFrame, clipDurationMs, frameKey, validatePack } from '../src/rendering/assets';
 const pack = (id: 'archie' | 'jumi') => JSON.parse(readFileSync(`public/pets/${id}/manifest.json`, 'utf8')) as AnimationPack;
 describe('bundled animation contract', () => {
   for (const id of PET_IDS) it(`${id} has valid in-bounds frames for every action and direction`, () => {
@@ -19,6 +19,8 @@ describe('bundled animation contract', () => {
     expect(animationFrame(manifest, 'walk', 'right', seconds + 0.001)).toEqual(clip.frames[1]);
     const duration = clip.frames.reduce((n, f) => n + f.duration, 0) / 1000;
     expect(animationFrame(manifest, 'walk', 'right', duration + 0.001)).toEqual(clip.frames[0]);
+    expect(clipDurationMs(manifest, 'walk', 'right')).toBe(duration * 1000);
+    expect(clipDurationMs(manifest, 'idle', 'left')).toBe(manifest.animations.idle.left.frames.reduce((n, f) => n + f.duration, 0));
   });
   it('rejects unsupported versions, missing actions and non-local atlas references', () => {
     const bad = pack('jumi'); (bad as { formatVersion: number }).formatVersion = 2;

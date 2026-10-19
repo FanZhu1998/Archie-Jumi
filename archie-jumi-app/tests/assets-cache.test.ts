@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ACTIONS, type Action, type AnimationPack, type Facing } from '../src/shared/types';
-import { alphaHit, frameKey, loadPack, pageFor, requestPage, validatePack } from '../src/rendering/assets';
+import { MAX_ACTIVE_PAGES, alphaHit, closePage, drawablePage, frameKey, loadPack, pageFor, requestPage, validatePack } from '../src/rendering/assets';
 
 const base = './pets/archie/';
 const pageUrl = (action: Action) => `${base}actions/${action}.png`;
@@ -66,34 +66,79 @@ function deferred<T>() {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('lazy action-page cache', () => {
-  it('keeps idle and one active page, closes only the evicted bitmap, and can reload an evicted action', async () => {
+  it('keeps idle and the four most recent action pages (a whole play cycle), closes only the evicted bitmap exactly once, and can reload an evicted action', async () => {
     const h = harness(), pack = await loadPack('archie');
     const idle = pageFor(pack, 'idle');
+    expect(MAX_ACTIVE_PAGES).toBe(4);
     expect([...pack.cache.keys()]).toEqual(['idle']);
     expect(h.requests(`${base}atlas.png`)).toBe(0);
 
+    // The play cycle (trot, sit, pounce, land) fits, so repeating it fetches no page again (P2-08).
+    const cycle: Action[] = ['trot', 'sit', 'pounce', 'land'];
+    for (let round = 0; round < 3; round++) for (const action of cycle) await requestPage(pack, action);
+    expect([...pack.cache.keys()]).toEqual(['idle', ...cycle]);
+    for (const action of cycle) expect(h.requests(pageUrl(action))).toBe(1);
+    const trot = pageFor(pack, 'trot'), sit = pageFor(pack, 'sit'), pounce = pageFor(pack, 'pounce');
+    expect(trot.image.close).not.toHaveBeenCalled();
+
+    // A fifth action page evicts the least recently requested one (trot) and closes its bitmap.
+    await requestPage(pack, 'walk');
+    expect([...pack.cache.keys()]).toEqual(['idle', 'sit', 'pounce', 'land', 'walk']);
+    expect(trot.image.close).toHaveBeenCalledTimes(1);
+    expect(trot.closed).toBe(true);
+    expect(sit.closed).toBe(false);
+    expect(idle.image.close).not.toHaveBeenCalled();
+    expect(pageFor(pack, 'trot')).toBe(idle);
+    expect(drawablePage(pack, 'trot')).toBeNull();
+
+    // Requesting a cached page makes it the most recent again, so the next eviction takes pounce instead of sit.
+    await requestPage(pack, 'sit');
+    expect([...pack.cache.keys()]).toEqual(['idle', 'pounce', 'land', 'walk', 'sit']);
+    await requestPage(pack, 'trot');
+    expect([...pack.cache.keys()]).toEqual(['idle', 'land', 'walk', 'sit', 'trot']);
+    expect(h.requests(pageUrl('trot'))).toBe(2);
+    expect(pounce.image.close).toHaveBeenCalledTimes(1);
+    expect(sit.image.close).not.toHaveBeenCalled();
+    expect(trot.image.close).toHaveBeenCalledTimes(1);
+    expect(pageFor(pack, 'trot').image).not.toBe(trot.image);
+    expect(pageFor(pack, 'trot').closed).toBe(false);
+    expect(pack.cache.size).toBe(1 + MAX_ACTIVE_PAGES);
+  });
+
+  it('stays bounded over many action changes and closes every evicted bitmap exactly once', async () => {
+    const h = harness(), pack = await loadPack('archie');
+    const order: Action[] = ['walk', 'sit', 'groom', 'walk', 'trot', 'pounce', 'land', 'sit', 'trot', 'sleep', 'wake', 'pet', 'eat'];
+    for (const action of order) {
+      await requestPage(pack, action);
+      expect(pack.cache.size).toBeLessThanOrEqual(1 + MAX_ACTIVE_PAGES);
+      expect(drawablePage(pack, action)?.clip).toBe(action);
+    }
+    const cached = new Set([...pack.cache.values()].map(page => page.image));
+    for (const images of h.bitmaps.values()) for (const image of images) {
+      expect(image.close).toHaveBeenCalledTimes(cached.has(image as unknown as ImageBitmap) ? 0 : 1);
+    }
+  });
+
+  it('never offers a closed page for drawing, and offers the idle clip after a failed load', async () => {
+    const h = harness(), pack = await loadPack('archie');
+    expect(drawablePage(pack, 'walk')).toBeNull();
     await requestPage(pack, 'walk');
     const walk = pageFor(pack, 'walk');
-    expect([...pack.cache.keys()]).toEqual(['idle', 'walk']);
-    expect(walk.image.close).not.toHaveBeenCalled();
-
-    await requestPage(pack, 'pet');
-    expect([...pack.cache.keys()]).toEqual(['idle', 'pet']);
+    expect(drawablePage(pack, 'walk')).toEqual({ page: walk, clip: 'walk' });
+    h.unavailable.add(pageUrl('eat'));
+    await expect(requestPage(pack, 'eat')).rejects.toThrow('Could not load character animation');
+    expect(drawablePage(pack, 'eat')).toEqual({ page: pageFor(pack, 'idle'), clip: 'idle' });
+    closePage(walk); closePage(walk);
     expect(walk.image.close).toHaveBeenCalledTimes(1);
-    expect(idle.image.close).not.toHaveBeenCalled();
-    expect(pageFor(pack, 'walk')).toBe(idle);
-
-    const pet = pageFor(pack, 'pet');
-    await requestPage(pack, 'walk');
-    expect([...pack.cache.keys()]).toEqual(['idle', 'walk']);
-    expect(h.requests(pageUrl('walk'))).toBe(2);
-    expect(pet.image.close).toHaveBeenCalledTimes(1);
-    expect(walk.image.close).toHaveBeenCalledTimes(1);
-    expect(pageFor(pack, 'walk').image).not.toBe(walk.image);
+    expect(walk.closed).toBe(true);
+    expect(drawablePage(pack, 'walk')).toBeNull();
   });
 
   it('deduplicates in-flight requests and stays bounded when requests complete out of order', async () => {
     const h = harness(), pack = await loadPack('archie');
+    // Three pages already cached, so the two out-of-order loads below push the cache one past its bound.
+    for (const action of ['sit', 'groom', 'sleep'] as Action[]) await requestPage(pack, action);
+    const sit = pageFor(pack, 'sit');
     const walkDecode = deferred<ImageBitmap>(), trotDecode = deferred<ImageBitmap>();
     h.decode.mockImplementation(async blob => {
       const url = (blob as unknown as { url: string }).url;
@@ -112,14 +157,15 @@ describe('lazy action-page cache', () => {
     const trot = h.makeBitmap(pageUrl('trot'));
     trotDecode.resolve(trot as unknown as ImageBitmap);
     await trotRequest;
-    expect([...pack.cache.keys()]).toEqual(['idle', 'trot']);
+    expect([...pack.cache.keys()]).toEqual(['idle', 'sit', 'groom', 'sleep', 'trot']);
     expect(pack.pending.has('walk')).toBe(true);
 
     const walk = h.makeBitmap(pageUrl('walk'));
     walkDecode.resolve(walk as unknown as ImageBitmap);
     await Promise.all([walkRequest, duplicateWalkRequest]);
-    expect([...pack.cache.keys()]).toEqual(['idle', 'walk']);
-    expect(trot.close).toHaveBeenCalledTimes(1);
+    expect([...pack.cache.keys()]).toEqual(['idle', 'groom', 'sleep', 'trot', 'walk']);
+    expect(sit.image.close).toHaveBeenCalledTimes(1);
+    expect(trot.close).not.toHaveBeenCalled();
     expect(walk.close).not.toHaveBeenCalled();
     expect(pack.pending.size).toBe(0);
     expect(h.bitmap('idle').close).not.toHaveBeenCalled();
@@ -203,6 +249,7 @@ describe('lazy action-page cache', () => {
     for (const action of ACTIONS) {
       await requestPage(pack, action);
       expect(pageFor(pack, action)).toBe(fullAtlas);
+      expect(drawablePage(pack, action)).toEqual({ page: fullAtlas, clip: action });
       expect(fullAtlas.masks.has(frameKey(manifest.animations[action].right.frames[0]))).toBe(true);
     }
     expect(fullAtlas.offsetX).toBe(0);

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CursorFeed, FEED_INTERVAL_MS, OUTSIDE, decideCursorFeed, type CursorMessage, type FeedState, type Rect } from '../src/main/cursor-feed';
+import {
+  CursorFeed, CursorRest, FEED_INTERVAL_MS, OUTSIDE, POINT_DEPART, POINT_REST_MS, POINT_WAIT_MS, PointChoice, REST_RADIUS, decideCursorFeed,
+  type CursorMessage, type FeedState, type Rect,
+} from '../src/main/cursor-feed';
 import { HOVER_GUARD_MS, decideInput, needsFreshSample, type InputDecisionState } from '../src/main/input-routing';
 import type { InputTarget, Point } from '../src/shared/types';
 
@@ -51,18 +54,19 @@ function harness(origin: Point | null = { x: 0, y: 0 }) {
   let callback: (() => void) | null = null;
   const intervals: number[] = [];
   const sent: CursorMessage[] = [];
+  const sampled: (Point | null)[] = [];
   let samples = 0;
   const feed = new CursorFeed({
     source: () => cursor,
     origin: () => origin,
     send: message => sent.push(message),
     now: () => now,
-    onSample: () => { samples++; },
+    onSample: sample => { samples++; sampled.push(sample); },
     setInterval: (fn, ms) => { callback = fn; intervals.push(ms); return 'handle'; },
     clearInterval: () => { callback = null; },
   });
   return {
-    feed, sent, intervals,
+    feed, sent, intervals, sampled,
     get samples() { return samples; },
     get now() { return now; },
     get scheduled() { return callback !== null; },
@@ -171,6 +175,37 @@ describe('CursorFeed', () => {
     expect(h.samples).toBe(1);
   });
 
+  it('hands the owner each evaluated sample in scene DIP, or null when there is none', () => {
+    const h = harness({ x: 10, y: 20 });
+    h.feed.setRegion([kitten]);
+    h.feed.start();
+    h.move({ x: 130, y: 130 }); h.tick();
+    h.move(null); h.tick();
+    h.move({ x: Number.NaN, y: 1 }); h.tick();
+    expect(h.sampled).toEqual([{ x: 120, y: 110 }, null, null]);
+  });
+
+  it('reports the cursor inside attention squares, which never count as hover for the guard', () => {
+    const square: Rect = { x: 0, y: 0, width: 300, height: 300 };
+    const h = harness();
+    h.feed.setRegion([kitten], [square]);
+    h.feed.start();
+    h.move({ x: 250, y: 250 }); h.advance(16); h.tick();
+    h.move({ x: 251, y: 250 }); h.advance(16); h.tick();
+    expect(h.sent).toEqual([{ inside: true, x: 250, y: 250 }, { inside: true, x: 251, y: 250 }]);
+    expect(h.feed.insideInterest()).toBe(false);
+    expect(h.feed.outsideSince()).toBe(1000);
+    // Onto the sprite rect: hover; back into the square only: outside again from that moment.
+    h.move({ x: 120, y: 110 }); h.advance(16); h.tick();
+    expect([h.feed.insideInterest(), h.feed.outsideSince()]).toEqual([true, null]);
+    h.move({ x: 200, y: 110 }); h.advance(16); h.tick();
+    expect([h.feed.insideInterest(), h.feed.outsideSince()]).toEqual([false, 1064]);
+    expect(h.sent.at(-1)).toEqual({ inside: true, x: 200, y: 110 });
+    // A region without squares still reports nothing there; the default is no squares.
+    h.feed.setRegion([kitten]);
+    expect(h.sent.at(-1)).toEqual({ inside: false });
+  });
+
   it('keeps running when sending fails', () => {
     let attempts = 0;
     const feed = new CursorFeed({ source: () => ({ x: 120, y: 110 }), origin: () => ({ x: 0, y: 0 }), send: () => { attempts++; throw new Error('renderer gone'); }, now: () => 0, setInterval: () => 1, clearInterval: () => {} });
@@ -213,6 +248,25 @@ describe('hover guard with the cursor feed', () => {
     expect(h.sent).toEqual([]);
   });
 
+  it('trips on a stale hover report at 300 ms with the cursor inside an attention square, off the sprite', () => {
+    // A hung renderer reported 'archie'; the cursor then moved off the sprite rect but stays inside the
+    // curiosity square around him, where positions keep flowing to the renderer.
+    const square: Rect = { x: 0, y: 0, width: 400, height: 400 };
+    const h = harness();
+    h.feed.setRegion([kitten], [square]);
+    h.feed.start();
+    h.move({ x: 120, y: 110 }); h.tick();
+    expect(handleReport(h, 'archie')).toEqual({ interactive: true, reason: 'hover' });
+    h.move({ x: 300, y: 300 }); h.tick();
+    const leftAt = h.now;
+    h.advance(HOVER_GUARD_MS - 1); h.move({ x: 301, y: 300 }); h.tick();
+    expect(handleReport(h, 'archie')).toEqual({ interactive: true, reason: 'hover' });
+    h.advance(1); h.move({ x: 302, y: 300 }); h.tick();
+    expect(h.feed.outsideSince()).toBe(leftAt);
+    expect(handleReport(h, 'archie')).toEqual({ interactive: false, reason: 'hover-guard' });
+    expect(h.sent).toEqual([{ inside: true, x: 120, y: 110 }, { inside: true, x: 300, y: 300 }, { inside: true, x: 301, y: 300 }, { inside: true, x: 302, y: 300 }]);
+  });
+
   it('asks for a fresh sample only for a hover report the latest sample places outside', () => {
     expect(needsFreshSample({ target: 'archie', capture: false }, true, false)).toBe(true);
     expect(needsFreshSample({ target: 'toy', capture: false }, true, false)).toBe(true);
@@ -220,5 +274,84 @@ describe('hover guard with the cursor feed', () => {
     expect(needsFreshSample({ target: 'archie', capture: true }, true, false)).toBe(false);
     expect(needsFreshSample({ target: null, capture: false }, true, false)).toBe(false);
     expect(needsFreshSample({ target: 'jumi', capture: false }, false, false)).toBe(false);
+  });
+});
+
+describe('Come here: where the cursor rests', () => {
+  const scene = { width: 1000, height: 600 };
+
+  it('remembers the last spot where the cursor rested for the minimum time, inside the scene only', () => {
+    const rest = new CursorRest(500);
+    rest.observe({ x: 100, y: 100 }, 0, scene);
+    rest.observe({ x: 100 + REST_RADIUS, y: 100 }, 499, scene);
+    expect(rest.lastRest()).toBeNull();
+    expect(rest.resting()).toEqual({ point: { x: 104, y: 100 }, since: 0 });
+    rest.observe({ x: 101, y: 101 }, 500, scene);
+    expect(rest.lastRest()).toEqual({ x: 101, y: 101 });
+    // Moving on, then pausing too briefly elsewhere, keeps the remembered spot.
+    rest.observe({ x: 300, y: 100 }, 520, scene);
+    expect(rest.resting()).toEqual({ point: { x: 300, y: 100 }, since: 520 });
+    rest.observe({ x: 300, y: 100 }, 900, scene);
+    expect(rest.lastRest()).toEqual({ x: 101, y: 101 });
+    // Outside the scene (the taskbar) or unknown: no rest, however long.
+    for (const outside of [{ x: 500, y: 620 }, { x: -1, y: 50 }, null]) {
+      rest.observe(outside, 1000, scene);
+      rest.observe(outside, 5000, scene);
+      expect(rest.resting()).toBeNull();
+    }
+    expect(rest.lastRest()).toEqual({ x: 101, y: 101 });
+    rest.reset();
+    expect([rest.lastRest(), rest.resting()]).toEqual([null, null]);
+  });
+
+  it('ends a rest once the cursor drifts more than the radius from where it stopped', () => {
+    const rest = new CursorRest(500);
+    rest.observe({ x: 100, y: 100 }, 0, scene);
+    rest.observe({ x: 103, y: 100 }, 200, scene);
+    rest.observe({ x: 100 + REST_RADIUS + 1, y: 100 }, 400, scene);
+    expect(rest.resting()).toEqual({ point: { x: 105, y: 100 }, since: 400 });
+    rest.observe({ x: 105, y: 100 }, 899, scene);
+    expect(rest.lastRest()).toBeNull();
+  });
+});
+
+describe('Come here: waiting for the user to point', () => {
+  const scene = { width: 1000, height: 600 };
+  /** Drives a choice with samples every 16 ms along `path` (a function of ms since the click). */
+  function drive(from: Point | null, path: (ms: number) => Point | null, until = POINT_WAIT_MS + 100) {
+    const rest = new CursorRest(500), choice = new PointChoice(from, 0);
+    for (let ms = 0; ms <= until; ms += 16) {
+      const sample = path(ms);
+      rest.observe(sample, ms, scene);
+      const result = choice.update(sample, rest.resting(), ms);
+      if (result !== null) return { result, ms };
+    }
+    return null;
+  }
+  const row = { x: 400, y: 300 };
+
+  it('chooses nothing while the hand stays on the menu row, and gives up after 6 s', () => {
+    expect(drive(row, () => row)).toEqual({ result: 'expired', ms: Math.ceil((POINT_WAIT_MS + 1) / 16) * 16 });
+    // Nudging within the departure distance is still the menu row.
+    expect(drive(row, ms => ({ x: row.x + Math.min(ms / 10, POINT_DEPART - 1), y: row.y }))?.result).toBe('expired');
+  });
+
+  it('sends the point where the cursor rests about 300 ms after moving away', () => {
+    const goal = { x: 700, y: 150 };
+    // Still on the row for a second, then a 400 ms glide to the goal, where it stays.
+    const path = (ms: number) => ms < 1000 ? row : ms < 1400 ? { x: row.x + (goal.x - row.x) * (ms - 1000) / 400, y: row.y + (goal.y - row.y) * (ms - 1000) / 400 } : goal;
+    const chosen = drive(row, path);
+    expect(chosen?.result).toEqual(goal);
+    expect(chosen!.ms).toBeGreaterThanOrEqual(1400 + POINT_REST_MS);
+    expect(chosen!.ms).toBeLessThan(1400 + POINT_REST_MS + 32);
+  });
+
+  it('ignores pauses outside the scene and gives up when the cursor never rests inside it', () => {
+    const path = (ms: number) => ms < 500 ? { x: 900, y: 650 } : { x: 100 + (Math.floor(ms / 16) % 2) * 50, y: 100 };
+    expect(drive(row, path)?.result).toBe('expired');
+  });
+
+  it('takes any rest when the click point was unknown', () => {
+    expect(drive(null, () => ({ x: 50, y: 60 }))).toEqual({ result: { x: 50, y: 60 }, ms: 304 });
   });
 });

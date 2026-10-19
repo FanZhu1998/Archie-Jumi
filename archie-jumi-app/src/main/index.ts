@@ -6,15 +6,17 @@ import { release } from 'node:os';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { StateStore } from './storage';
 import { windowsLoginTarget } from './login-item';
-import { CursorFeed } from './cursor-feed';
+import { CursorFeed, CursorRest, PointChoice } from './cursor-feed';
 import { HOVER_GUARD_MS, decideInput, ignoreOptionsFor, needsFreshSample, parseInputRouting, type InputDecision, type InputRouting } from './input-routing';
 import { HeartbeatWatchdog, RecoveryBudget, RECOVERY_LIMIT } from './watchdog';
 import { DiagnosticsLog, copyVerified, type DiagnosticsDetails } from './diagnostics';
 import { displayRecreateReason, snapshotDisplay, type DisplaySnapshot } from './display-policy';
 import { defaultPreferences } from '../shared/defaults';
-import { normalizePreferences, validCommand } from '../shared/validation';
+import { normalizePreferences, samePositions, validCommand } from '../shared/validation';
+import { LEAP_HEIGHT } from '../core/engine';
 import { validHeartbeat, validInputModePayload, validInterest, validSceneState } from '../shared/ipc';
-import { PET_IDS, type Bootstrap, type PetId, type Preferences, type PetCommand, type Lifecycle, type Point, type SceneCarryOver, type DiagnosticsResult } from '../shared/types';
+import { PET_IDS, type Bootstrap, type PetId, type Preferences, type PetCommand, type Lifecycle, type Point, type SceneCarryOver, type DiagnosticsResult, type InterestPayload, type Rect } from '../shared/types';
+import type { PetSummary, SceneSummary } from '../rendering/scene-summary';
 
 const smoke = process.argv.includes('--smoke-test');
 const hookLossCheck = smoke && process.argv.includes('--hook-loss-check');
@@ -73,6 +75,10 @@ const smokeClipboard = {
 };
 let lastRearmAt = 0, hoverGuardTrips = 0, heartbeatResyncs = 0, displayEventsIgnored = 0;
 let lastHandoff: { generation: number; outcome: 'reported' | 'timeout' } | null = null;
+/** The interest region the current overlay sent last (the smoke test checks its attention squares). */
+let interestRegion: InterestPayload | null = null;
+/** Smoke runs only: console errors the overlay pages logged (newest 50; messages truncated). */
+const overlayConsoleErrors: { generation: number; message: string }[] = [];
 interface NativeIgnore { ignore: boolean; forward: boolean }
 /** What main last applied with setIgnoreMouseEvents (null without an overlay), plus the newest calls for smoke checks. */
 let nativeIgnore: NativeIgnore | null = null, nativeWrites = 0;
@@ -82,14 +88,32 @@ const diagnostics = new DiagnosticsLog(app.getPath('userData'), { context: diagn
 const watchdog = new HeartbeatWatchdog(() => performance.now());
 const budget = new RecoveryBudget();
 const cursorSource = (): Point | null => scriptedCursor ? { ...scriptedCursor } : screen.getCursorScreenPoint();
+/** Come here (I9) from the tray uses the last spot where the cursor rested this long inside the scene. */
+const TRAY_REST_MS = 500;
+/** Where the cursor rests, from the feed's own samples (in memory only). */
+const cursorRest = new CursorRest(TRAY_REST_MS);
+/** The rest point frozen when the tray menu opened, so pausing on the menu itself never counts. */
+let trayRestPoint: Point | null = null;
+let trayMenu: Menu | null = null;
+type ComeSource = 'tray' | 'menu';
+/** A Come here chosen in a kitten's menu, waiting for the user to point (at most one at a time). */
+let pendingCome: { petId: PetId; generation: number; source: ComeSource; choice: PointChoice } | null = null;
+/** Smoke runs only: the come commands main sent, newest last. */
+const comeLog: { petId: PetId; point: Point; source: ComeSource }[] = [];
 const feed = new CursorFeed({
   source: cursorSource,
   origin: () => overlayOrigin,
   send: message => { sendTo(overlay, 'cursor', { generation, ...message }); },
   now: () => performance.now(),
   // Feed samples matter to the decision only for a stored hover report (the hover guard), so the
-  // steady state costs one cursor read per tick. The heartbeat still re-decides every second.
-  onSample: () => { if (inputMode.target !== null && !inputMode.capture) applyInputMode('feed'); },
+  // steady state costs one cursor read per tick. The heartbeat still re-decides every second. The same
+  // samples tell Come here where the cursor rests.
+  onSample: sample => {
+    const now = performance.now();
+    cursorRest.observe(sample, now, overlayScene());
+    if (pendingCome) resolvePendingCome(sample, now);
+    if (inputMode.target !== null && !inputMode.capture) applyInputMode('feed');
+  },
 });
 
 function bootstrap(): Bootstrap {
@@ -136,6 +160,9 @@ function cursorScene(): Point | null {
   }
 }
 function stopFeed(reason: string) {
+  // Nothing samples the cursor any more (hidden, paused, Quiet Mode, recovery, a new overlay): a Come
+  // here still waiting for the user to point gives up.
+  cancelPendingCome();
   if (!feed.active()) return;
   feed.stop();
   // The renderer may still believe the cursor is inside; resynchronize it with the stopped feed.
@@ -274,6 +301,10 @@ function createOverlay(trigger = 'startup') {
   generation++;
   inputMode = { target: null, capture: false };
   feed.setRegion([]);
+  interestRegion = null;
+  // The new scene may lie on another display: forget where the cursor rested.
+  cursorRest.reset();
+  trayRestPoint = null;
   const display = getDisplay(), bounds = display.workArea;
   overlayDisplay = snapshotDisplay(display);
   const win = new BrowserWindow({ ...bounds, show: false, transparent: true, backgroundColor: '#00000000', frame: false, resizable: false, movable: false, focusable: false, skipTaskbar: true, hasShadow: false, alwaysOnTop: true, webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' } });
@@ -295,6 +326,15 @@ function createOverlay(trigger = 'startup') {
     recover('unresponsive', SCENE_NOTICE.unresponsive);
   });
   win.on('closed', () => { if (overlay === win) { overlay = null; applyInputMode('overlay-closed'); } });
+  if (smoke) {
+    // The smoke test requires motion steps without page errors; the renderer counts uncaught ones too.
+    const forGeneration = generation;
+    win.webContents.on('console-message', details => {
+      if (details.level !== 'error') return;
+      overlayConsoleErrors.push({ generation: forGeneration, message: String(details.message).slice(0, 300) });
+      if (overlayConsoleErrors.length > 50) overlayConsoleErrors.shift();
+    });
+  }
   void win.loadFile(rendererFile, { query: { view: 'overlay' } });
   watchdog.grace(GRACE_MS);
   diagnostics.log('overlay-create', { generation, trigger, routing: inputRouting, ...geometry(win) });
@@ -388,11 +428,56 @@ function applyCommand(command: PetCommand) {
   if ('petId' in command && (command.type === 'show' || command.type === 'hide')) {
     preferences.pets[command.petId].visible = command.type === 'show'; scheduleSave(); sendBootstrap();
   }
+  // Any other command for a kitten replaces a Come here that is still waiting for the user to point.
+  if ('petId' in command && command.type !== 'come' && pendingCome?.petId === command.petId) cancelPendingCome();
   sendTo(overlay, 'pet-command', command);
 }
-function petItems(id: PetId): MenuItemConstructorOptions[] {
+/**
+ * Come here (I9). From the tray, the kitten walks to where the cursor last rested inside the scene before
+ * the tray was used (frozen when the pointer reached the tray icon or its menu opened, so pausing on the
+ * menu itself never counts). From a kitten's own menu, which always opens on the kitten, main waits up to
+ * POINT_WAIT_MS for the user to point: the cursor must leave the menu row and rest inside the scene.
+ */
+function comeHere(id: PetId, source: ComeSource) {
+  cancelPendingCome();
+  if (source === 'tray') {
+    const point = trayRestPoint ?? cursorRest.lastRest();
+    if (point) sendCome(id, point, 'tray');
+    else diagnostics.log('come-no-point', { generation, petId: id });
+    return;
+  }
+  pendingCome = { petId: id, generation, source, choice: new PointChoice(cursorScene(), performance.now()) };
+  diagnostics.log('come-armed', { generation, petId: id });
+}
+function sendCome(id: PetId, point: Point, source: ComeSource) {
+  const command = validCommand({ type: 'come', petId: id, point }, overlayScene());
+  if (!command || command.type !== 'come') return;
+  if (smoke) { comeLog.push({ petId: id, point: { ...command.point }, source }); if (comeLog.length > 20) comeLog.shift(); }
+  diagnostics.log('come', { generation, petId: id, source });
+  applyCommand(command);
+}
+/** Feed samples for a Come here that waits for the user to point (see PointChoice). */
+function resolvePendingCome(sample: Point | null, now: number) {
+  const pending = pendingCome;
+  if (!pending) return;
+  if (pending.generation !== generation) { cancelPendingCome(); return; }
+  const result = pending.choice.update(sample, cursorRest.resting(), now);
+  if (result === null) return;
+  pendingCome = null;
+  if (result === 'expired') { diagnostics.log('come-expired', { generation, petId: pending.petId }); return; }
+  sendCome(pending.petId, result, pending.source);
+}
+function cancelPendingCome() {
+  if (!pendingCome) return;
+  diagnostics.log('come-cancelled', { generation, petId: pendingCome.petId });
+  pendingCome = null;
+}
+/** The tray's Come here target: the last cursor rest inside the scene, taken before the tray menu is used. */
+function freezeTrayRest() { trayRestPoint = cursorRest.lastRest(); }
+function petItems(id: PetId, source: ComeSource): MenuItemConstructorOptions[] {
   return [
     { label: 'Pet', click: () => applyCommand({ type: 'pet', petId: id }) },
+    { label: 'Come here', click: () => comeHere(id, source) },
     { label: 'Give a treat', click: () => applyCommand({ type: 'treat', petId: id }) },
     { label: 'Play with yarn', click: () => applyCommand({ type: 'play', petId: id, automatic: false }) },
     { label: 'Automatic yarn play', click: () => applyCommand({ type: 'play', petId: id, automatic: true }) },
@@ -404,15 +489,18 @@ function petItems(id: PetId): MenuItemConstructorOptions[] {
   ];
 }
 function updateTray() {
-  tray?.setContextMenu(Menu.buildFromTemplate([
+  if (!tray) return;
+  trayMenu = Menu.buildFromTemplate([
     { label: hidden ? 'Show All' : 'Hide All', click: () => setHidden(!hidden) },
     { label: 'Quiet Mode', type: 'checkbox', checked: preferences.quiet, click: () => updatePreferences({ quiet: !preferences.quiet }) },
     { type: 'separator' },
-    ...PET_IDS.map(id => ({ label: preferences.pets[id].name, submenu: petItems(id) })),
+    ...PET_IDS.map(id => ({ label: preferences.pets[id].name, submenu: petItems(id, 'tray') })),
     { label: 'End Play', click: () => applyCommand({ type: 'end-play' }) },
     { label: 'Monitor', submenu: screen.getAllDisplays().map(d => ({ label: `${d.label || 'Display'} · ${d.workArea.width} × ${d.workArea.height}`, type: 'radio' as const, checked: getDisplay().id === d.id, click: () => updatePreferences({ selectedDisplay: String(d.id) }) })) },
     { type: 'separator' }, { label: 'Settings', click: openSettings }, { label: 'Quit', click: () => app.quit() }
-  ]));
+  ]);
+  trayMenu.on('menu-will-show', freezeTrayRest);
+  tray.setContextMenu(trayMenu);
 }
 function registerShortcut() {
   globalShortcut.unregisterAll();
@@ -504,7 +592,10 @@ function installIpc() {
     if (!isSender(event, 'overlay')) return;
     const interest = validInterest(payload, overlayScene());
     if (!interest) { invalidPayload('interest'); return; }
-    if (interest.generation === generation) feed.setRegion(interest.rects);
+    if (interest.generation !== generation) return;
+    // Attention squares are reported by the feed but never count for the hover guard (P2-14).
+    feed.setRegion(interest.rects, interest.attention);
+    interestRegion = interest;
   });
   ipcMain.on('scene-state', (event, payload) => {
     if (!isSender(event, 'overlay')) return;
@@ -530,10 +621,15 @@ function installIpc() {
   ipcMain.on('positions', (event, positions) => {
     if (!isSender(event, 'overlay') || !positions || typeof positions !== 'object') return;
     const pets = Object.fromEntries(PET_IDS.map(id => [id, { position: positions[id] }]));
-    preferences = normalizePreferences({ pets }, preferences); scheduleSave();
+    const next = normalizePreferences({ pets }, preferences);
+    // The renderer reports every 5 s; only a real move rewrites state.json (P2-28).
+    const moved = !samePositions(next, preferences);
+    preferences = next;
+    if (!moved) return;
+    scheduleSave();
     sendTo(settings, 'bootstrap-update', bootstrap());
   });
-  ipcMain.on('pet-menu', (event, id) => { if (isSender(event, 'overlay') && PET_IDS.includes(id)) Menu.buildFromTemplate(petItems(id)).popup({ window: overlay! }); });
+  ipcMain.on('pet-menu', (event, id) => { if (isSender(event, 'overlay') && PET_IDS.includes(id)) Menu.buildFromTemplate(petItems(id, 'menu')).popup({ window: overlay! }); });
   ipcMain.on('app-action', (event, action) => {
     if (!isSender(event)) return;
     if (action === 'toggle-hidden') setHidden(!hidden);
@@ -607,7 +703,7 @@ async function smokeUntil(predicate: () => boolean, timeoutMs: number, stepMs = 
   }
   return true;
 }
-interface OverlayCounters { pointerEvents: number; cursorMessages: number; frames: number; fallbackFrames: number; drags: number; lostReleases: number; lastMode: string }
+interface OverlayCounters { pointerEvents: number; cursorMessages: number; frames: number; fallbackFrames: number; drags: number; lostReleases: number; lastMode: string; pageErrors: number; purring: boolean; scene: SceneSummary }
 async function overlayCounters(): Promise<OverlayCounters | null> {
   try { return await overlay?.webContents.executeJavaScript('window.__archieJumi ? { ...window.__archieJumi } : null') ?? null; } catch { return null; }
 }
@@ -617,7 +713,10 @@ const SMOKE_REQUIRED = [
   'pollingRouting', 'hoverLatencyOk', 'hoverExit', 'hoverGuard', 'powerCycle', 'displayNoop', 'frameStallSelfHeal', 'heartbeatAutoRecover', 'crashAutoRecovered', 'recoveryBudgetExhausts', 'budgetManualRestore', 'hybridRearmSafe',
   'dragHeld', 'dragMoved', 'lostPointerUpGuard', 'heartbeatResync', 'displayRecreate', 'frameStallRafRestored', 'recoveryHiddenFrozen', 'budgetTeardown',
   'realPointerIgnored', 'diagnosticsCopyFeedback',
+  'motionRenders', 'treatFlow', 'heldPet', 'clickPet', 'hoverWithTransforms', 'comeHere', 'curiosityToggle', 'curiosityNotices',
 ];
+/** Visual-review captures of the Phase 2 motion steps, written to test-results/. */
+const MOTION_CAPTURES = ['motion-play.png', 'motion-pounce.png', 'motion-treat.png', 'motion-held-pet.png'];
 /**
  * `npm run smoke`: clears the previous run's outputs, leaves a failing placeholder report until
  * the final write, and exits non-zero for any failed or missing check, exception or unwritable report.
@@ -627,7 +726,7 @@ async function runSmoke() {
   const checks: Record<string, unknown> = {}, errors: string[] = [];
   try {
     await mkdir(smokeOutput, { recursive: true });
-    for (const name of ['smoke-report.json', 'smoke-error.txt', 'desktop-pets.png', 'play.png', 'control-panel.png']) await rm(join(smokeOutput, name), { force: true });
+    for (const name of ['smoke-report.json', 'smoke-error.txt', 'desktop-pets.png', 'play.png', 'control-panel.png', ...MOTION_CAPTURES]) await rm(join(smokeOutput, name), { force: true });
     // Replaced only by the final write below: a killed, hung or crashed run leaves a failing report.
     await writeFile(reportFile, JSON.stringify({ version: app.getVersion(), startedAt, errors: ['Smoke run did not finish'] }, null, 2));
     await smokeSteps(checks);
@@ -773,6 +872,7 @@ async function smokeSteps(checks: Record<string, unknown>) {
     checks.heartbeatResync = await until(() => inputMode.target === null && !inputMode.capture && !interactive, 1500) && heartbeatResyncs > resyncsBefore;
     checks.hoverGuardDetails = { trips: hoverGuardTrips - tripsBefore, becameInteractive, resyncs: heartbeatResyncs - resyncsBefore };
     step('hoverGuard');
+    await interactionSmoke(checks, { step, hovering, leave, hoverArchie, center });
   }
   updatePreferences({ quiet: true }); await wait(300); checks.quietInputSafe = inputMode.target === null && !inputMode.capture && !interactive && nativeInSync();
   updatePreferences({ quiet: false });
@@ -974,6 +1074,366 @@ async function smokeSteps(checks: Record<string, unknown>) {
   await store.save({ schemaVersion: 1, preferences });
   checks.saved = true;
 }
+/** A motion capture: the PNG written, the captured scene rect, its pixels, and how much of it is drawn (DIP² with alpha ≥ 128). */
+interface MotionCapture { file: string; rect: Rect; pixels: number; opaqueDip: number; ok: boolean }
+/** A drawn kitten covers about half of size² in the bundled art; a capture counts as showing it above this fraction of size². */
+const KITTEN_COVER_MIN = 0.12;
+/**
+ * The torso on the kitten's centre line, as a fraction of its size below the centre (frame v ≈ 0.585):
+ * opaque in every walk, trot, idle, sit, pet and land frame of both bundled kittens, for either facing.
+ */
+const TORSO_OFFSET = 0.1;
+/** Below the kitten centre, as a multiple of size: opaque in the unlifted pounce frame, empty mid-leap (both packs). */
+const GROUND_PROBE = 0.25;
+/**
+ * Captures the overlay page around a kitten (scene DIP, clipped to the scene) into test-results/<name>.png:
+ * the kitten with room for its leap, and a toy or treat in front of it. `ok` when the drawn pixels cover
+ * at least KITTEN_COVER_MIN × size², which the toy, a treat or effects alone never reach.
+ */
+async function captureMotion(name: string, pet: PetSummary): Promise<MotionCapture | null> {
+  if (!overlayAlive()) return null;
+  const scene = overlayScene();
+  const left = Math.max(0, Math.floor(pet.x - 1.5 * pet.size)), top = Math.max(0, Math.floor(pet.y - 1.15 * pet.size));
+  const right = Math.min(scene.width, Math.ceil(pet.x + 1.5 * pet.size)), bottom = Math.min(scene.height, Math.ceil(pet.y + 0.8 * pet.size));
+  if (right - left < 1 || bottom - top < 1) return null;
+  const rect = { x: left, y: top, width: right - left, height: bottom - top };
+  try {
+    const image = await overlay!.webContents.capturePage(rect);
+    await writeFile(join(smokeOutput, `${name}.png`), image.toPNG());
+    // Whatever scale the bitmap has, its share of mostly opaque pixels converts to DIP² of the rect.
+    const bitmap = image.toBitmap(), pixels = bitmap.length / 4;
+    let opaque = 0;
+    for (let i = 3; i < bitmap.length; i += 4) if (bitmap[i] >= 128) opaque++;
+    const opaqueDip = pixels > 0 ? Math.round(opaque * rect.width * rect.height / pixels) : 0;
+    return { file: `${name}.png`, rect, pixels, opaqueDip, ok: opaqueDip >= KITTEN_COVER_MIN * pet.size * pet.size };
+  } catch {
+    return null;
+  }
+}
+interface SmokeHelpers {
+  step: (name: string) => void;
+  hovering: (id: PetId) => boolean;
+  leave: () => Promise<boolean>;
+  hoverArchie: (at: Point, timeoutMs?: number) => Promise<boolean>;
+  center: Point;
+}
+/**
+ * Phase 2 interactions (spec 6.5), all with the scripted cursor: the curious toggle and attention
+ * squares, curiosity end to end, Come here, the treat flow, motion captures during play and a pounce,
+ * hold-to-pet and a quick click, and hover on a kitten that turns around and walks. Saves the
+ * motion-*.png captures for visual review and leaves the cursor far away.
+ */
+async function interactionSmoke(checks: Record<string, unknown>, { step, hovering, leave, hoverArchie, center }: SmokeHelpers) {
+  const wait = smokeWait, until = smokeUntil, scene = getScene();
+  const summary = async (): Promise<SceneSummary | null> => (await overlayCounters())?.scene ?? null;
+  const petNow = async (id: PetId): Promise<PetSummary | null> => (await summary())?.pets.find(pet => pet.id === id) ?? null;
+  /** Polls an async probe every `stepMs` until it holds or `timeoutMs` passes. */
+  const untilAsync = async (probe: () => Promise<boolean>, timeoutMs: number, stepMs = 20): Promise<boolean> => {
+    const end = performance.now() + timeoutMs;
+    for (;;) {
+      if (await probe()) return true;
+      if (performance.now() >= end) return false;
+      await wait(stepMs);
+    }
+  };
+  const sendInput = (event: Parameters<BrowserWindow['webContents']['sendInputEvent']>[0]) => { overlay?.webContents.sendInputEvent(event); };
+  const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+  // Two clear spots, well apart and away from the edges: attention squares stay whole and each capture shows one kitten.
+  const spots: Record<PetId, Point> = {
+    archie: { x: Math.round(scene.width * 0.3), y: Math.round(scene.height * 0.45) },
+    jumi: { x: Math.round(scene.width * 0.65), y: Math.round(scene.height * 0.45) },
+  };
+  /** Ends play and moves both kittens to their spots; after the 0.5 s landing both sit (moving also ends a pair activity). */
+  const settle = async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      applyCommand({ type: 'end-play' });
+      for (const id of PET_IDS) applyCommand({ type: 'move', petId: id, point: spots[id] });
+      await wait(700);
+      const now = await summary();
+      if (now && now.pair === null && now.toy === null && now.pets.every(pet => pet.visible && pet.action === 'sit')) return true;
+    }
+    return false;
+  };
+
+  /** Moves one kitten back to its spot; after the landing it sits for 4 to 8 s, long enough for a 2.5 s dwell. */
+  const resettle = async (id: PetId): Promise<boolean> => {
+    applyCommand({ type: 'move', petId: id, point: spots[id] });
+    await wait(700);
+    return (await petNow(id))?.action === 'sit';
+  };
+
+  // Attention squares (spec 5.2, 6.4): with `curious` on, a sitting kitten adds a square of 3.2 × size
+  // around itself to the interest region, far larger than any sprite rect; with it off, none is sent.
+  // The watcher is a kitten that may notice the cursor (Jumi unless she cannot); the other one naps
+  // through the curiosity checks, so no pair activity can start and move the watcher meanwhile.
+  await leave();
+  const settled = await settle();
+  const settledScene = await summary();
+  const watcherId: PetId | null = settledScene?.attentive.includes('jumi') ? 'jumi' : settledScene?.attentive[0] ?? null;
+  const sleeperId = PET_IDS.find(id => id !== (watcherId ?? 'jumi'))!;
+  applyCommand({ type: 'nap', petId: sleeperId });
+  const largest = Math.max(...PET_IDS.map(id => preferences.pets[id].size));
+  const isSquare = (rect: Rect) => rect.width >= 2.5 * largest && rect.height >= 2.5 * largest;
+  const squares = () => interestRegion?.generation === generation ? interestRegion.attention.filter(isSquare).length : 0;
+  const squaresOn = await until(() => squares() > 0, 3000, 20);
+  // P2-14: the squares travel separately and never enter the hover guard's sprite and toy rects.
+  const squaresKeptApart = interestRegion?.generation === generation && !interestRegion.rects.some(isSquare);
+  const curiousOn = await summary();
+  updatePreferences({ curious: false });
+  const squaresCleared = await until(() => squares() === 0, 1000, 10);
+  await wait(500);
+  const curiousOff = await summary();
+  const stayedClear = squares() === 0 && curiousOff?.attention === 0 && curiousOff.attentive.length === 0;
+  updatePreferences({ curious: true });
+  const squaresBack = await until(() => squares() > 0, 1500, 20);
+  checks.curiosityToggle = settled && watcherId !== null && squaresOn && squaresKeptApart && (curiousOn?.attention ?? 0) > 0 && squaresCleared && stayedClear && squaresBack;
+  checks.curiosityToggleDetails = { settled, attentive: settledScene?.attentive ?? null, watcher: watcherId, sleeper: sleeperId, squaresOn, squaresKeptApart, attentionOn: curiousOn?.attention ?? null, squaresCleared, stayedClear, squaresBack };
+  step('curiosityToggle');
+
+  // Curiosity end to end (spec 6.2): the cursor feed reaches engine.observeCursor. A cursor resting
+  // behind the sitting watcher, inside its attention square but off its sprite, makes it turn to face
+  // the cursor after 2.5 s, and the window stays click-through meanwhile.
+  const watchReady = watcherId !== null && await resettle(watcherId);
+  const watcher = watcherId ? await petNow(watcherId) : null;
+  let noticed = false, clickThrough = true, noticeMs: number | null = null, pairDuring: string | null = null;
+  if (watchReady && watcher) {
+    const cursor = { x: watcher.x + (watcher.facing === 'left' ? 1.1 : -1.1) * watcher.size, y: watcher.y };
+    const placedAt = performance.now();
+    setSmokeCursor(cursor);
+    noticed = await untilAsync(async () => {
+      clickThrough &&= !interactive;
+      const now = await summary();
+      const pet = now?.pets.find(item => item.id === watcher.id);
+      pairDuring ??= now?.pair ?? null;
+      return !!pet && pet.facing !== watcher.facing && (pet.facing === 'right') === (cursor.x > pet.x);
+    }, 4500, 25);
+    if (noticed) noticeMs = Math.round(performance.now() - placedAt);
+  }
+  await leave();
+  // P2-32: the turn must come from the 2.5 s dwell (plus feed and frame latency), not from any turn at all.
+  checks.curiosityNotices = watchReady && noticed && clickThrough && pairDuring === null && noticeMs !== null && noticeMs >= 2400 && noticeMs <= 3200;
+  checks.curiosityNoticesDetails = { watcher: watcherId, watchReady, noticed, noticeMs, clickThrough, pairDuring };
+  step('curiosityNotices');
+
+  // Come here (I9, P2-05). From the tray, the kitten walks to where the cursor last rested inside the
+  // scene before it reached the tray. From the kitten's own menu, main waits for the user to point: a
+  // cursor that stays on the menu row chooses nothing, a cursor that moves away and rests is the target.
+  const menusOffer = PET_IDS.every(id => (['tray', 'menu'] as const).every(source => petItems(id, source).some(item => item.label === 'Come here')));
+  const comeTrial = async (source: ComeSource, offset: Point) => {
+    applyCommand({ type: 'move', petId: 'jumi', point: spots.jumi });
+    await wait(700);
+    const from = await petNow('jumi');
+    if (!from) return { source, ok: false };
+    const goal = { x: Math.round(from.x + offset.x), y: Math.round(from.y + offset.y) };
+    const sentBefore = comeLog.length;
+    let earlySend = false;
+    if (source === 'tray') {
+      setSmokeCursor(goal);
+      await wait(TRAY_REST_MS + 250);
+      freezeTrayRest(); // the pointer reaches the tray icon...
+      setSmokeCursor(null); // ...which lies outside the scene
+      comeHere('jumi', 'tray');
+    } else {
+      setSmokeCursor({ x: from.x, y: from.y }); // the menu opens on the kitten
+      comeHere('jumi', 'menu');
+      setSmokeCursor({ x: from.x + 20, y: from.y + 30 }); // resting on the menu row
+      await wait(700);
+      earlySend = comeLog.length !== sentBefore;
+      setSmokeCursor(goal);
+    }
+    const startDistance = distance(from, goal);
+    const walking = await untilAsync(async () => { const now = await petNow('jumi'); return !!now && now.action === 'walk' && now.speed > 0; }, 1500, 10);
+    let closer = false;
+    const arrived = await untilAsync(async () => {
+      const now = await petNow('jumi');
+      if (!now) return false;
+      closer ||= distance(now, goal) < startDistance - 40;
+      return now.action === 'sit' && distance(now, goal) <= 2;
+    }, 8000, 25);
+    const sent = comeLog.length > sentBefore ? comeLog[comeLog.length - 1] : null;
+    // Away well before the 2.5 s a resting cursor needs to be noticed.
+    await leave();
+    const aimed = !!sent && sent.source === source && distance(sent.point, goal) <= 2;
+    return { source, goal, sent: sent ? sent.point : null, earlySend, walking, closer, arrived, ok: !earlySend && aimed && walking && closer && arrived };
+  };
+  const trayTrial = await comeTrial('tray', { x: -220, y: 60 });
+  const menuTrial = await comeTrial('menu', { x: 210, y: -50 });
+  checks.comeHere = menusOffer && trayTrial.ok && menuTrial.ok;
+  checks.comeHereDetails = { menusOffer, tray: trayTrial, menu: menuTrial };
+  step('comeHere');
+
+  // Treat (I4): it drops in front of her and bounces, she walks over and eats, it turns to crumbs and
+  // disappears, and she sits.
+  applyCommand({ type: 'move', petId: 'jumi', point: spots.jumi });
+  await wait(700);
+  const phases = new Set<string>();
+  let walkedToTreat = false, ate = false, treatGone = false, satAfter = false, treatCapture: MotionCapture | null = null;
+  const treatStarted = performance.now();
+  applyCommand({ type: 'treat', petId: 'jumi' });
+  while (performance.now() - treatStarted < 9000) {
+    const now = await summary();
+    const jumi = now?.pets.find(pet => pet.id === 'jumi'), treat = now?.treats.find(item => item.petId === 'jumi');
+    if (!now || !jumi) break;
+    if (treat) phases.add(treat.phase);
+    if (treat?.phase === 'resting' && jumi.action === 'walk') walkedToTreat = true;
+    if (jumi.action === 'eat') {
+      ate = true;
+      if (!treatCapture && jumi.actionTime >= 0.6) treatCapture = await captureMotion('motion-treat', jumi);
+    }
+    if (ate && !treat) treatGone = true;
+    if (treatGone && jumi.action === 'sit') { satAfter = true; break; }
+    await wait(20);
+  }
+  checks.treatFlow = phases.has('falling') && phases.has('resting') && phases.has('eaten') && walkedToTreat && ate && treatGone && satAfter;
+  checks.treatFlowDetails = { phases: [...phases], walkedToTreat, ate, treatGone, satAfter, ms: Math.round(performance.now() - treatStarted), capture: treatCapture };
+  step('treatFlow');
+
+  // The motion layer draws real kittens (spec 6.5): captures during automatic play and in mid-leap,
+  // and no page errors in this overlay at all.
+  const motionGeneration = generation;
+  applyCommand({ type: 'move', petId: 'jumi', point: spots.jumi });
+  await wait(700);
+  applyCommand({ type: 'play', petId: 'jumi', automatic: true });
+  await wait(1500);
+  const player = await petNow('jumi');
+  const playCapture = player ? await captureMotion('motion-play', player) : null;
+  const playToy = (await summary())?.toy ?? null;
+  applyCommand({ type: 'end-play' });
+  // Manual play leaves the toy still and just in reach: she eyes it, crouches and leaps onto it.
+  applyCommand({ type: 'move', petId: 'jumi', point: spots.jumi });
+  await wait(700);
+  applyCommand({ type: 'play', petId: 'jumi', automatic: false });
+  let leap: number | null = null, pounceCapture: MotionCapture | null = null;
+  const pounceStarted = performance.now();
+  while (performance.now() - pounceStarted < 8000) {
+    const jumi = await petNow('jumi');
+    // Captured after the take-off, so the capture lands near the apex.
+    if (jumi && jumi.leap !== null && jumi.leap >= 0.25 && jumi.leap <= 0.75) {
+      leap = jumi.leap;
+      pounceCapture = await captureMotion('motion-pounce', jumi);
+      break;
+    }
+    await wait(5);
+  }
+  const landed = leap !== null && await untilAsync(async () => (await petNow('jumi'))?.action === 'land', 1000, 10);
+  applyCommand({ type: 'end-play' });
+  await wait(150);
+  const motionCounters = await overlayCounters();
+  const consoleErrors = overlayConsoleErrors.filter(entry => entry.generation === motionGeneration);
+  checks.motionRenders = !!playCapture?.ok && !!pounceCapture?.ok && leap !== null && landed
+    && motionCounters?.pageErrors === 0 && consoleErrors.length === 0 && generation === motionGeneration;
+  checks.motionRendersDetails = { play: playCapture, playToy, pounce: pounceCapture, leapProgress: leap, landed, pageErrors: motionCounters?.pageErrors ?? null, consoleErrors };
+  step('motionRenders');
+
+  // Hold-to-pet (I2): a press that stays put for 350 ms becomes a held pet (hearts and the looping
+  // purr); its release ends it and the kitten sits. Sound is on at volume 0, so the run stays silent.
+  const soundBefore = { sound: preferences.sound, volume: preferences.volume };
+  updatePreferences({ sound: true, volume: 0 });
+  const holdHover = await hoverArchie(center);
+  sendInput({ type: 'mouseMove', ...center });
+  await wait(30);
+  sendInput({ type: 'mouseDown', ...center, button: 'left', clickCount: 1 });
+  await wait(450);
+  const holding = await overlayCounters();
+  const heldArchie = holding?.scene.pets.find(pet => pet.id === 'archie') ?? null;
+  const heldCapture = heldArchie ? await captureMotion('motion-held-pet', heldArchie) : null;
+  sendInput({ type: 'mouseUp', ...center, button: 'left', clickCount: 1 });
+  // A hold shorter than a click's pet ends like a click (P2-01): no longer held at once, still petting
+  // until its 2 s are up, then the kitten sits.
+  const releasedNotHeld = await untilAsync(async () => { const now = await petNow('archie'); return !!now && !now.held; }, 300, 10);
+  const petAfterRelease = (await petNow('archie'))?.action ?? null;
+  const releasedToSit = releasedNotHeld && petAfterRelease === 'pet'
+    && await untilAsync(async () => { const now = await petNow('archie'); return !!now && now.action === 'sit' && !now.held; }, 2500, 20);
+  const captureFreed = await until(() => !inputMode.capture, 300);
+  const purrStopped = await untilAsync(async () => (await overlayCounters())?.purring === false, 1000, 20);
+  // A quick click is still the 2 s pet, and no hold starts after its release.
+  sendInput({ type: 'mouseDown', ...center, button: 'left', clickCount: 1 });
+  await wait(80);
+  sendInput({ type: 'mouseUp', ...center, button: 'left', clickCount: 1 });
+  const clicked = await untilAsync(async () => { const now = await petNow('archie'); return !!now && now.action === 'pet' && !now.held; }, 400, 10);
+  await wait(400);
+  const afterClick = await petNow('archie');
+  updatePreferences(soundBefore);
+  checks.heldPet = holdHover && !!heldArchie && heldArchie.held && heldArchie.action === 'pet' && releasedToSit && captureFreed && !!heldCapture?.ok;
+  checks.clickPet = clicked && !!afterClick && afterClick.action === 'pet' && !afterClick.held;
+  checks.purrLoop = holding?.purring === true && purrStopped;
+  checks.heldPetDetails = { holdHover, held: heldArchie, releasedNotHeld, petAfterRelease, releasedToSit, captureFreed, capture: heldCapture, purring: holding?.purring ?? null, purrStopped, clicked, afterClick };
+  step('heldPet');
+
+  // Hover through transforms (spec 5.2): the scripted cursor follows the torso of a kitten that turns
+  // around and walks (bob and lean), and the hover holds; the turn's mid-squeeze may drop a sample.
+  const hoverStart = await hoverArchie(center);
+  const start = await petNow('archie');
+  let samples = 0, hits = 0, walkSamples = 0, turned = false, sat = false, longestMissMs = 0;
+  let missFrom: number | null = null;
+  if (start) {
+    applyCommand({ type: 'come', petId: 'archie', point: { x: center.x + (start.facing === 'right' ? -160 : 160), y: center.y } });
+    const end = performance.now() + 6000;
+    while (performance.now() < end) {
+      const archie = await petNow('archie');
+      if (!archie) break;
+      setSmokeCursor({ x: archie.x, y: archie.y + TORSO_OFFSET * archie.size });
+      await wait(12);
+      samples++;
+      const sampledAt = performance.now();
+      if (hovering('archie')) {
+        hits++;
+        if (missFrom !== null) longestMissMs = Math.max(longestMissMs, sampledAt - missFrom);
+        missFrom = null;
+      } else {
+        missFrom ??= sampledAt;
+      }
+      if (archie.facing !== start.facing) turned = true;
+      if (archie.action === 'walk' && archie.speed > 0) walkSamples++;
+      if (walkSamples > 0 && archie.action === 'sit') { sat = true; break; }
+    }
+    if (missFrom !== null) longestMissMs = Math.max(longestMissMs, performance.now() - missFrom);
+  }
+  const hoverEnd = hovering('archie');
+  await leave();
+
+  // ...and through pounce leaps, where only a hit test that follows the pose passes (P2-12). Mid-leap
+  // the lifted torso must hover. A ground point GROUND_PROBE × size below the centre is opaque only
+  // in the unlifted frame: placed once the kitten is airborne, it must never hover. Each probe gets a
+  // fresh manual-play session: the kitten eyes the toy and leaps onto it once, and later pounces on a
+  // toy that lies under its paws happen in place, without a leap.
+  let liftedSamples = 0, liftedHits = 0, groundSamples = 0, groundHits = 0, leaps = 0;
+  for (let session = 0; session < 6 && (liftedSamples < 2 || groundSamples < 2); session++) {
+    const probe: 'lifted' | 'ground' = liftedSamples < 2 && (session % 2 === 0 || groundSamples >= 2) ? 'lifted' : 'ground';
+    applyCommand({ type: 'end-play' });
+    applyCommand({ type: 'move', petId: 'jumi', point: spots.jumi });
+    await wait(700);
+    applyCommand({ type: 'play', petId: 'jumi', automatic: false });
+    let inLeap = false;
+    const sessionUntil = performance.now() + 6000;
+    while (performance.now() < sessionUntil) {
+      const jumi = await petNow('jumi');
+      if (!jumi) break;
+      const progress = jumi.leap;
+      if (progress !== null && progress <= 0.7) {
+        if (!inLeap) { inLeap = true; leaps++; }
+        const lift = LEAP_HEIGHT * jumi.size * Math.sin(Math.PI * progress);
+        if (probe === 'lifted') {
+          setSmokeCursor({ x: jumi.x, y: jumi.y + TORSO_OFFSET * jumi.size - lift });
+          if (progress >= 0.4 && progress <= 0.65) { liftedSamples++; if (hovering('jumi')) liftedHits++; }
+        } else if (progress >= 0.3) {
+          setSmokeCursor({ x: jumi.x, y: jumi.y + GROUND_PROBE * jumi.size });
+          if (progress >= 0.4 && progress <= 0.65) { groundSamples++; if (hovering('jumi')) groundHits++; }
+        }
+      } else if (inLeap) {
+        break;
+      }
+      await wait(5);
+    }
+    setSmokeCursor(null);
+  }
+  applyCommand({ type: 'end-play' });
+  await leave();
+  const leapHover = liftedSamples >= 2 && liftedHits >= 2 && liftedHits / liftedSamples >= 0.5 && groundSamples >= 2 && groundHits === 0;
+  checks.hoverWithTransforms = hoverStart && turned && walkSamples >= 20 && sat && samples >= 50 && hits / samples >= 0.9 && longestMissMs <= 100 && hoverEnd && leapHover;
+  checks.hoverWithTransformsDetails = { hoverStart, samples, hits, walkSamples, turned, sat, longestMissMs: Math.round(longestMissMs), hoverEnd, leaps, liftedSamples, liftedHits, groundSamples, groundHits };
+  step('hoverWithTransforms');
+}
 /**
  * Opt-in native confirmation of the root cause: `--smoke-test --hook-loss-check` after a build.
  * Runs instead of the smoke steps and writes test-results/hook-loss-report.json. It sends real
@@ -1139,6 +1599,8 @@ if (squirrelStartup || !app.requestSingleInstanceLock()) {
     installIpc();
     tray = new Tray(nativeImage.createFromPath(join(__dirname, 'icon.png')).resize({ width: 32, height: 32 }));
     tray.setToolTip('Archie & Jumi'); tray.on('double-click', openSettings);
+    // Come here from the tray: remember where the cursor rested before it reached the tray.
+    tray.on('mouse-enter', freezeTrayRest); tray.on('click', freezeTrayRest); tray.on('right-click', freezeTrayRest);
     registerShortcut(); createOverlay(); updateTray();
     if (!process.argv.includes('--start-hidden-panel')) openSettings();
     let displayTimer: NodeJS.Timeout | undefined;

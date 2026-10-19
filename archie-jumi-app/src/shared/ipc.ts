@@ -6,6 +6,8 @@ import { ACTIONS, PET_IDS } from './types';
 import type { Action, Facing, HeartbeatPayload, InputModePayload, InputTarget, InterestPayload, PetId, Rect, SceneCarryOver, ScenePetCarryOver, Size } from './types';
 
 export const MAX_INTEREST_RECTS = 8;
+/** Cursor-curiosity attention squares per interest payload: one per kitten, with room to spare. */
+export const MAX_ATTENTION_RECTS = 4;
 /** A heartbeat counts frames for about one second; anything near this bound is not a real count. */
 export const MAX_HEARTBEAT_FRAMES = 100_000;
 
@@ -37,18 +39,30 @@ export function validHeartbeat(value: unknown): HeartbeatPayload | null {
  * Interest rectangles are in scene DIP. They may extend a little past the scene edges, but
  * every number must be finite, sizes non-negative and at most twice the scene size.
  */
-export function validInterest(value: unknown, scene: Size): InterestPayload | null {
-  const v = record(value);
-  if (!v || !validGeneration(v.generation) || !Array.isArray(v.rects) || v.rects.length > MAX_INTEREST_RECTS) return null;
+function validRects(value: unknown, max: number, scene: Size): Rect[] | null {
+  if (!Array.isArray(value) || value.length > max) return null;
   const rects: Rect[] = [];
-  for (const item of v.rects as unknown[]) {
+  for (const item of value as unknown[]) {
     const r = record(item);
     if (!r || !finite(r.x) || !finite(r.y) || !finite(r.width) || !finite(r.height)) return null;
     if (r.width < 0 || r.height < 0 || r.width > scene.width * 2 || r.height > scene.height * 2) return null;
     if (r.x < -scene.width || r.x > scene.width * 2 || r.y < -scene.height || r.y > scene.height * 2) return null;
     rects.push({ x: r.x, y: r.y, width: r.width, height: r.height });
   }
-  return { generation: v.generation, rects };
+  return rects;
+}
+
+/**
+ * `rects` (sprite and toy rects, at most MAX_INTEREST_RECTS) and `attention` (curiosity squares, at most
+ * MAX_ATTENTION_RECTS; a missing list means none) follow the same rules; either one invalid drops the payload.
+ */
+export function validInterest(value: unknown, scene: Size): InterestPayload | null {
+  const v = record(value);
+  if (!v || !validGeneration(v.generation)) return null;
+  const rects = validRects(v.rects, MAX_INTEREST_RECTS, scene);
+  const attention = v.attention === undefined ? [] : validRects(v.attention, MAX_ATTENTION_RECTS, scene);
+  if (!rects || !attention) return null;
+  return { generation: v.generation, rects, attention };
 }
 
 function validPetCarryOver(value: unknown): ScenePetCarryOver | null {

@@ -145,7 +145,7 @@ describe('browser preview adapter', () => {
     expect(adapter.cursorFeed).toBe(false);
     expect((await adapter.getBootstrap()).carryOver).toBeNull();
     expect((await adapter.getBootstrap()).scriptedCursor).toBe(false);
-    expect(() => adapter.setInterest({ generation: 1, rects: [{ x: 0, y: 0, width: 10, height: 10 }] })).not.toThrow();
+    expect(() => adapter.setInterest({ generation: 1, rects: [{ x: 0, y: 0, width: 10, height: 10 }], attention: [{ x: -100, y: -100, width: 210, height: 210 }] })).not.toThrow();
     expect(() => adapter.reportScene({ generation: 1, pets: { archie: { action: 'sleep', facing: 'left', forcedSleep: true }, jumi: { action: 'sit', facing: 'right', forcedSleep: false } } })).not.toThrow();
     expect(() => adapter.heartbeat({ generation: 1, frames: 30, target: 'archie', capture: false })).not.toThrow();
     const cursor = vi.fn();
@@ -155,6 +155,28 @@ describe('browser preview adapter', () => {
     expect(cursor).not.toHaveBeenCalled();
     expect(bootstrap).not.toHaveBeenCalled();
     await expect(adapter.copyDiagnostics()).resolves.toEqual({ ok: false, message: 'Diagnostics are available in the desktop app.' });
+  });
+
+  it('forwards come-here commands with clipped points but never the local-only hold commands', async () => {
+    const adapter = createPreviewAdapter();
+    const commands: PetCommand[] = [];
+    adapter.onCommand(command => commands.push(command));
+    adapter.sendCommand({ type: 'pet-hold', petId: 'archie' });
+    adapter.sendCommand({ type: 'pet-release', petId: 'archie' });
+    adapter.sendCommand({ type: 'come', petId: 'jumi', point: { x: 5000, y: -3 } });
+    expect(commands).toEqual([{ type: 'come', petId: 'jumi', point: { x: 1200, y: 0 } }]);
+  });
+
+  it('keeps the curious preference across reloads and preview tabs', async () => {
+    const playground = createPreviewAdapter();
+    expect((await playground.getBootstrap()).preferences.curious).toBe(true);
+    setWindow('settings');
+    const settings = createPreviewAdapter();
+    await settle();
+    await settings.savePreferences({ curious: false });
+    await settle();
+    expect((await playground.getBootstrap()).preferences.curious).toBe(false);
+    expect((await createPreviewAdapter().getBootstrap()).preferences.curious).toBe(false);
   });
 
   it('saves normalized positions and supports listener cleanup', async () => {

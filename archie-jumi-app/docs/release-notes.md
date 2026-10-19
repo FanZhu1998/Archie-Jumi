@@ -1,5 +1,70 @@
 # Archie & Jumi — release notes
 
+## 1.1.0 — livelier kittens
+
+Windows 11 x64 · October 18, 2026. Includes everything in 1.0.2.
+
+### New things to do with Archie and Jumi
+
+- **Hold to pet.** Press on a kitten and keep still. After about a third of a second it becomes a continuous pet, with hearts and a soft looping purr, for up to eight seconds. A quick click is still the two-second pet, and a short hold never gives less than a click.
+- **Curious kittens.** When the pointer rests near a sitting or idle kitten for about two and a half seconds, it turns to look, and sometimes walks over and sits. Each kitten then waits 90 to 180 seconds before noticing again. Settings → Your calm corner → Curious about the cursor turns this off. It is on by default and has no effect in Quiet Mode.
+- **Come here.** In a kitten's right-click menu, choose Come here, then point at a spot and hold the pointer still for a moment. From the tray, the kitten walks to where the pointer last rested on the desktop.
+- **Real pounces.** During yarn play a kitten crouches, leaps onto the yarn and lands softly. In automatic play a landing can bat the yarn away, so the chase goes on. The yarn rolls as it moves and trails its thread.
+- **Treats you can see.** A treat drops in front of the kitten and bounces once. The kitten walks over, eats it, and leaves a few crumbs.
+- **More everyday variety.** Kittens look around, groom between sits, stretch after waking, and now and then sit near the bottom of the screen. More energetic kittens walk and trot a little faster.
+- **Better together.** A nose boop ends with a small heart puff, and kittens napping together breathe in step.
+
+### Motion
+
+The kittens now move with procedural motion layered on the photographic poses:
+
+- breathing while sitting and sleeping, and a bob and lean while walking
+- a quick turn instead of an instant flip
+- a soft squash on landing and a stretch on waking
+- a gentle swing while carried, which eases back when let go
+- an arc through the air during a pounce, with the shadow staying on the ground
+
+Poses blend over 120 ms when the action changes. The previous pose stays on screen while the next one loads, so the idle pose no longer flashes between actions.
+
+Hit testing follows exactly what is drawn, so a kitten in mid-leap is clickable where it is, not where it was. Hover also stays steady while a kitten turns or lands under a resting pointer. The large curiosity areas around kittens never count as hover, so 1.0.2's guard against stale hover still works next to them.
+
+Gentler motion turns all of this off: no procedural motion, particles or blends, and simple static hearts and z's as before. Treats appear at the kitten's paws, and Come here moves the kitten at once. Quiet Mode keeps the kittens resting and adds none of the new behaviour.
+
+### Art pipeline for more frames
+
+`npm run art` can now use four optional pose sheets per kitten (E to H). They add four-frame walks and trots, a three-stage pounce, breathing sleep, chewing, two-frame grooming, petting and waking, and true left-facing idle, sit and sleep poses. Without those sheets the packs are byte-identical to today's. `docs/phase3-art-prompts.md` has ready-to-use prompts and review steps. No new artwork has been generated yet. The packer also gained `--source-dir`, `--output-dir`, `--work-dir` and `--check`, and it replaces packs safely: a failed write leaves the previous pack intact.
+
+### Validation and resource use
+
+TypeScript, 472 unit tests in 29 files, the browser UI check in Edge (now including the curious toggle and hold-to-pet), and the native smoke test with 45 required checks passed. The new native checks cover:
+
+- the motion captures during play, a pounce, a treat and a held pet, with no page errors
+- the treat flow, hold-to-pet and a quick click
+- hover on a walking and turning kitten, and in mid-leap: the lifted torso hovered every time (7 of 7), a ground point that only an untransformed sprite would cover never did (0 of 6)
+- Come here from both menus, the curious toggle, and curiosity end to end (the kitten turned after 2.5 s)
+
+The 37 checks from 1.0.2 still pass. Hover latency was at most 21 ms.
+
+| State | 1.0.2 CPU | 1.1.0 CPU | 1.1.0 combined working set |
+| --- | ---: | ---: | ---: |
+| Resting/sleeping | 0.60% | 0.80% | 366 MiB |
+| Awake, idle variety (new phase, not gated) | — | 0.79% | 382 MiB |
+| Automatic yarn play | 1.84% | 2.26% | 400 MiB |
+| Hidden | 0.10% | 0.03% | 388 MiB |
+
+CPU is a share of total system capacity on this Windows 11 / Ryzen 5 5500U machine; each phase lasted about eight seconds. Resting costs more than in 1.0.2 because breathing and drifting z's are now drawn, at 4 frames a second for napping kittens and 3 after 20 seconds of deep nap. Hidden kittens draw nothing.
+
+### Install
+
+`npm run make` builds `out/make/squirrel.windows/x64/ArchieJumiSetup.exe` (unsigned, same application identity as 1.0.x, so it upgrades in place). The 1.1.0 installer was built and its packaged app passed the native smoke test; it was not installed.
+
+### Known limits
+
+- The purr loop has only been checked silently. Its level and texture still need a listen.
+- The new poses blend across photographic stills. Multi-frame art from sheets E to H would make walking, pouncing and grooming smoother.
+- The app does not yet follow Windows' "Animation effects" setting; turn on Gentler motion in Settings instead.
+- Physical-mouse checks, real lock and sleep cycles and a long soak remain open, as listed for 1.0.2.
+
 ## 1.0.2 — kittens keep reacting
 
 Windows 11 x64 · October 18, 2026

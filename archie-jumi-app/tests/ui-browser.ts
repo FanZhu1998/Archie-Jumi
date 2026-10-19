@@ -59,6 +59,22 @@ try {
   await page.getByRole('checkbox', { name: 'Gentler motion' }).check();
   await expect(page.locator('.companion-app')).toHaveClass(/reduced-motion/);
 
+  // Curious about the cursor: on by default, saved across a reload, and disabled while Quiet Mode is on.
+  const curious = page.getByRole('checkbox', { name: 'Curious about the cursor' });
+  const savedCurious = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)!).preferences.curious, key);
+  await expect(curious).toBeChecked();
+  await expect(page.getByText('Kittens notice a resting cursor and may wander over.')).toBeVisible();
+  await curious.uncheck();
+  await expect.poll(savedCurious).toBe(false);
+  await page.reload();
+  await expect(curious).not.toBeChecked();
+  await page.getByRole('checkbox', { name: 'Quiet mode' }).check();
+  await expect(curious).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Quiet mode' }).uncheck();
+  await expect(curious).toBeEnabled();
+  await curious.check();
+  await expect.poll(savedCurious).toBe(true);
+
   const playground = await context.newPage();
   playground.on('pageerror', error => errors.push(error.message));
   await playground.goto(`${base}/?view=overlay`);
@@ -76,6 +92,21 @@ try {
   await expect(page.getByRole('status').last()).toContainText('nose-to-nose');
   await page.getByRole('button', { name: 'End play' }).click();
 
+  // The motion layer's canvases are attached, and hold-to-pet works with the real mouse: a press on
+  // Archie that stays put for 350 ms becomes a held pet, and its release ends it (he sits).
+  await expect.poll(() => playground.locator('canvas').count()).toBeGreaterThanOrEqual(2);
+  type KittenSummary = { id: string; x: number; y: number; size: number; action: string; held: boolean };
+  const archie = () => playground.evaluate(() => (window as unknown as { __archieJumi: { scene: { pets: KittenSummary[] } } }).__archieJumi.scene.pets.find(pet => pet.id === 'archie')!);
+  await card.getByRole('button', { name: 'Pet', exact: true }).click();
+  await expect.poll(async () => (await archie()).action).toBe('pet');
+  const pressed = await archie();
+  await playground.mouse.move(pressed.x, pressed.y + pressed.size * 0.1);
+  await playground.mouse.down();
+  await expect.poll(async () => (await archie()).held).toBe(true);
+  await playground.mouse.up();
+  await expect.poll(async () => { const now = await archie(); return now.action === 'sit' && !now.held; }).toBe(true);
+  await playground.mouse.move(5, 5);
+
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1100, height: 900 });
@@ -90,7 +121,7 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/browser-control-panel.png', fullPage: true });
   expect(errors).toEqual([]);
-  console.log('Browser UI passed: artwork, rename/reload, keyboard slider, play, repeated reposition, quiet, visibility, sound, reduced motion, live playground, mobile layout, and no page errors.');
+  console.log('Browser UI passed: artwork, rename/reload, keyboard slider, play, repeated reposition, quiet, visibility, sound, reduced motion, curious toggle, live playground, hold-to-pet, mobile layout, and no page errors.');
 } finally {
   await browser.close();
   previewServer?.kill();

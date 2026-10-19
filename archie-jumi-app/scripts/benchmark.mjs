@@ -1,6 +1,9 @@
 /**
  * Screenshot-free native Electron benchmark. Run after `npm run build`:
- *   node scripts/benchmark.mjs [--seconds=5] [--output=test-results/performance.json] [--app-arg=<flag>]...
+ *   node scripts/benchmark.mjs [--seconds=5] [--awake-seconds=20] [--output=test-results/performance.json] [--app-arg=<flag>]...
+ *
+ * Phases: resting (both kittens napping), awake (informational, not gated: both kittens woken and
+ * left to their own choices for --awake-seconds), active-play and hidden.
  *
  * `--app-arg` (repeatable) passes a switch to the app, for example the plan F6 comparison:
  *   node scripts/benchmark.mjs --output=test-results/performance-native-occlusion.json --app-arg=--native-occlusion
@@ -20,6 +23,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const seconds = Number(process.argv.find(argument => argument.startsWith('--seconds='))?.split('=')[1] ?? 5);
 if (!Number.isFinite(seconds) || seconds < 3 || seconds > 30) throw new Error('--seconds must be between 3 and 30.');
+// Awake kittens pick unseeded sits, grooms, walks and sleeps, so this phase needs a longer sample.
+const awakeSeconds = Number(process.argv.find(argument => argument.startsWith('--awake-seconds='))?.split('=')[1] ?? 20);
+if (!Number.isFinite(awakeSeconds) || awakeSeconds < 20 || awakeSeconds > 600) throw new Error('--awake-seconds must be between 20 and 600.');
 const outputArgument = process.argv.find(argument => argument.startsWith('--output='))?.slice('--output='.length);
 const appArgs = process.argv.filter(argument => argument.startsWith('--app-arg=')).map(argument => argument.slice('--app-arg='.length));
 for (const flag of appArgs) if (!/^--[\w-]+(=[\w.-]+)?$/.test(flag)) throw new Error(`--app-arg expects one app switch such as --native-occlusion, not "${flag}".`);
@@ -52,16 +58,23 @@ const report = {
   environment: { platform: platform(), release: release(), logicalProcessors: processors, cpu: cpus()[0]?.model },
   method: {
     sampleDurationSeconds: seconds,
+    awakeSampleDurationSeconds: awakeSeconds,
     sampleIntervalSeconds: 1,
+    phases: {
+      resting: 'Both kittens napping: the resting budget of spec 5.6.',
+      awake: 'Informational, not gated: both kittens woken, then left to their own unseeded sit, groom, idle, walk and sleep choices, so samples vary from run to run.',
+      'active-play': 'Both kittens woken and automatic yarn play started for Jumi.',
+      hidden: 'Overlay hidden from the panel.',
+    },
     appArgs,
     screenshotsTaken: false,
     settingsOpened: false,
     isolatedProfile: profile,
     cpu: 'Sum of per-process cumulativeCPUUsage deltas / wall seconds / logical processors × 100. This is percent of total system CPU capacity, not percent of one core.',
     memory: 'Electron workingSetSize/privateBytes are KiB; reported totals are MiB. Summed working sets can double-count memory shared across processes; private bytes are committed memory, not resident memory. GPU process data is not GPU utilization or dedicated VRAM.',
-    drawing: 'Only drawImage calls on attached HTMLCanvasElement surfaces inside the pet-overlay document are counted. Detached atlas-mask work, including lazy page loads, is excluded. With two visible kittens, two sprite draws equal one scene render. Instrumentation and Playwright add small overhead.',
+    drawing: 'Only calls on attached HTMLCanvasElement surfaces inside the pet-overlay document are counted; detached atlas-mask work, including lazy page loads, is excluded. spriteDraws counts drawImage calls (a crossfade draws two sprites). layerRedraws counts clearRect calls: the overlay clears a layer exactly once per redraw, whatever it then draws (kitten, effect, pair or toy layer). compositedFrames counts render passes (an animation frame, fallback timer frame or state update) that redraw at least one layer; each yields one composited frame. Frames that only hide or restack a layer are not counted. Instrumentation and Playwright add small overhead.',
     canvasMemory: 'Sum of width × height ×4 bytes for all attached canvas backing stores. This estimates one RGBA surface per canvas, not additional compositor buffers or atlas textures.',
-    targets: { restingTotalCpuPercentBelow: 1, summedWorkingSetMiBBelow: 500, hiddenSpriteDraws: 0 },
+    targets: { restingTotalCpuPercentBelow: 1, summedWorkingSetMiBBelow: 500, hiddenSpriteDraws: 0, hiddenLayerRedraws: 0 },
   },
   phases: [],
   errors: [],
@@ -150,13 +163,22 @@ try {
   }
   if (!page) throw new Error('No live overlay reached visible, nonempty-canvas, stable readiness within 30 seconds. See diagnostic events; no performance result is valid.');
   await page.evaluate(() => {
-    window.__benchmarkSpriteDraws = 0;
-    const original = CanvasRenderingContext2D.prototype.drawImage;
+    const counts = { spriteDraws: 0, layerRedraws: 0, compositedFrames: 0 };
+    window.__benchmarkCounts = counts;
+    const overlaySurface = canvas => canvas instanceof HTMLCanvasElement && canvas.isConnected && document.body.classList.contains('pet-overlay');
+    const { drawImage, clearRect } = CanvasRenderingContext2D.prototype;
     CanvasRenderingContext2D.prototype.drawImage = function (...args) {
-      if (this.canvas instanceof HTMLCanvasElement && this.canvas.isConnected && document.body.classList.contains('pet-overlay')) {
-        window.__benchmarkSpriteDraws++;
+      if (overlaySurface(this.canvas)) counts.spriteDraws++;
+      return Reflect.apply(drawImage, this, args);
+    };
+    // A render pass is synchronous, so its layer redraws all happen before the next microtask checkpoint.
+    let passCounted = false;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (overlaySurface(this.canvas)) {
+        counts.layerRedraws++;
+        if (!passCounted) { passCounted = true; counts.compositedFrames++; queueMicrotask(() => { passCounted = false; }); }
       }
-      return Reflect.apply(original, this, args);
+      return Reflect.apply(clearRect, this, args);
     };
   });
   const environment = await application.evaluate(({ app, BrowserWindow, screen }) => ({
@@ -192,17 +214,17 @@ try {
         index, width: canvas.width, height: canvas.height, visible: getComputedStyle(canvas).display !== 'none',
         backingBytes: canvas.width * canvas.height * 4,
       }));
-      return { spriteDraws: window.__benchmarkSpriteDraws, dpr: devicePixelRatio, canvases,
+      return { ...window.__benchmarkCounts, dpr: devicePixelRatio, canvases,
         canvasBackingBytes: canvases.reduce((sum, canvas) => sum + canvas.backingBytes, 0) };
     });
     return { atMilliseconds: (started + performance.now()) / 2, processes, renderer };
   }
 
-  async function phase(name, setup) {
+  async function phase(name, setup, durationSeconds = seconds) {
     await setup();
     await wait(1500); // Exclude transition and image-upload work from each steady-state sample.
     const samples = [await sample()];
-    const deadline = performance.now() + seconds * 1000;
+    const deadline = performance.now() + durationSeconds * 1000;
     while (performance.now() < deadline) {
       await wait(Math.min(1000, Math.max(1, deadline - performance.now())));
       samples.push(await sample());
@@ -220,13 +242,15 @@ try {
     const totalAt = entry => entry.processes.reduce((sum, metric) => sum + metric.workingSetKiB / 1024, 0);
     const completeCpu = perProcess.every(metric => metric.cpuSecondsDelta !== null);
     const totalCpu = completeCpu ? perProcess.reduce((sum, metric) => sum + metric.totalSystemCpuPercent, 0) : null;
-    const spriteDraws = last.renderer.spriteDraws - first.renderer.spriteDraws;
+    const counted = key => last.renderer[key] - first.renderer[key];
+    const spriteDraws = counted('spriteDraws'), layerRedraws = counted('layerRedraws'), compositedFrames = counted('compositedFrames');
     const result = {
       name, elapsedSeconds: round(elapsed),
       totalSystemCpuPercent: totalCpu === null ? null : round(totalCpu, 4),
       summedWorkingSetMiB: { mean: round(samples.reduce((sum, entry) => sum + totalAt(entry), 0) / samples.length), min: round(Math.min(...samples.map(totalAt))), max: round(Math.max(...samples.map(totalAt))), end: round(totalAt(last)) },
       summedPrivateMiB: round(last.processes.reduce((sum, metric) => sum + (metric.privateBytesKiB ?? 0) / 1024, 0)),
-      spriteDraws, approximateSceneRendersPerSecond: round(spriteDraws / 2 / elapsed),
+      spriteDraws, layerRedraws, layerRedrawsPerSecond: round(layerRedraws / elapsed),
+      compositedFrames, compositedFramesPerSecond: round(compositedFrames / elapsed),
       surfaces: last.renderer.canvases,
       devicePixelRatio: last.renderer.dpr,
       canvasBackingBytes: last.renderer.canvasBackingBytes,
@@ -236,7 +260,7 @@ try {
     };
     report.phases.push(result);
     await writeFile(output, JSON.stringify(report, null, 2), 'utf8');
-    console.log(`${name}: ${result.totalSystemCpuPercent ?? 'unavailable'}% total CPU; ${result.summedWorkingSetMiB.mean} MiB summed working set; ${result.approximateSceneRendersPerSecond} scene renders/s`);
+    console.log(`${name}: ${result.totalSystemCpuPercent ?? 'unavailable'}% total CPU; ${result.summedWorkingSetMiB.mean} MiB summed working set; ${result.compositedFramesPerSecond} composited frames/s (${result.layerRedrawsPerSecond} layer redraws/s)`);
   }
 
   await wait(3500); // Let first asset decoding finish, with no screenshots or settings.
@@ -245,17 +269,23 @@ try {
     window.desktop.sendCommand({ type: 'nap', petId: 'archie' });
     window.desktop.sendCommand({ type: 'nap', petId: 'jumi' });
   }));
+  // The commonest unattended state; the 1.5 s settle covers the 1.1 s wake stretch.
+  await phase('awake', () => page.evaluate(() => {
+    window.desktop.sendCommand({ type: 'wake', petId: 'archie' });
+    window.desktop.sendCommand({ type: 'wake', petId: 'jumi' });
+  }), awakeSeconds);
   await phase('active-play', () => page.evaluate(() => {
     window.desktop.sendCommand({ type: 'wake', petId: 'archie' });
     window.desktop.sendCommand({ type: 'wake', petId: 'jumi' });
     window.desktop.sendCommand({ type: 'play', petId: 'jumi', automatic: true });
   }));
   await phase('hidden', () => page.evaluate(() => window.desktop.action('hide')));
+  const resting = report.phases.find(entry => entry.name === 'resting'), hidden = report.phases.find(entry => entry.name === 'hidden');
   report.acceptance = {
-    restingCpuBelowOnePercent: report.phases[0].totalSystemCpuPercent === null ? null : report.phases[0].totalSystemCpuPercent < 1,
-    restingWorkingSetBelow500MiB: report.phases[0].summedWorkingSetMiB.mean < 500,
-    hiddenDrawingStopped: report.phases[2].spriteDraws === 0,
-    note: 'This short instrumented run is a targeted engineering measurement, not a hardware-independent performance guarantee.',
+    restingCpuBelowOnePercent: resting.totalSystemCpuPercent === null ? null : resting.totalSystemCpuPercent < 1,
+    restingWorkingSetBelow500MiB: resting.summedWorkingSetMiB.mean < 500,
+    hiddenDrawingStopped: hidden.spriteDraws === 0 && hidden.layerRedraws === 0,
+    note: 'The awake phase is informational and not gated. This short instrumented run is a targeted engineering measurement, not a hardware-independent performance guarantee.',
   };
 } catch (error) {
   report.errors.push(error?.stack ?? String(error));

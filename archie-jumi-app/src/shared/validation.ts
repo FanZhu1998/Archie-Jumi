@@ -13,6 +13,12 @@ export function normalizePreferences(value: unknown, base: Preferences = default
   }
   return result;
 }
+/** Normalized kitten positions closer than this on both axes count as unchanged (0.3 DIP on a 3072 DIP wide display). */
+export const POSITION_EPSILON = 1e-4;
+/** Both kittens' saved positions match within POSITION_EPSILON (everything else is ignored). */
+export function samePositions(a: Preferences, b: Preferences, epsilon = POSITION_EPSILON): boolean {
+  return PET_IDS.every(id => Math.abs(a.pets[id].position.x - b.pets[id].position.x) < epsilon && Math.abs(a.pets[id].position.y - b.pets[id].position.y) < epsilon);
+}
 export function validCommand(value: unknown, scene: Size): PetCommand | null {
   const c = obj(value), type = c.type;
   if (type === 'end-play') return { type };

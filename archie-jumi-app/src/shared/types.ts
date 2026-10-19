@@ -24,7 +24,12 @@ export interface InputModePayload { generation: number; target: InputTarget; cap
 /** Sent every second: `frames` counts frame-loop ticks since the previous beat; target/capture resync the input report. */
 export interface HeartbeatPayload extends InputModePayload { frames: number }
 /** Where the renderer wants to be told about the cursor (inflated sprite and toy rectangles). */
-export interface InterestPayload { generation: number; rects: Rect[] }
+/**
+ * `rects`: inflated sprite and toy rectangles — every pixel `hit()` can return lies inside them, and only
+ * these feed main's hover guard. `attention`: cursor-curiosity squares around attentive kittens; the feed
+ * also reports the cursor inside them, but they never count as hover for the guard (at most 4).
+ */
+export interface InterestPayload { generation: number; rects: Rect[]; attention: Rect[] }
 /** Main-process cursor feed: the cursor in scene DIP while it is inside the interest region, then one `inside: false`. */
 export type CursorFeedMessage =
   | { generation: number; inside: true; x: number; y: number }

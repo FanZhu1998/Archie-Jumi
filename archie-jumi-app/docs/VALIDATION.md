@@ -1,5 +1,34 @@
 # Archie & Jumi — validation record
 
+## Build 1.1.0
+
+Windows x64, from source on the development PC. Checked October 18, 2026.
+
+| Check | Result |
+| --- | --- |
+| TypeScript | Passed |
+| Automated tests | 472 passed in 29 files |
+| Browser UI | Passed in Edge, now including the curious toggle and hold-to-pet |
+| Native smoke | All 45 required checks passed (the 37 from 1.0.2 plus 8 for 1.1.0) |
+| Native benchmark | Resting 0.80%, awake 0.79%, play 2.26%, hidden 0.03% of total CPU; 366–400 MiB combined working set; zero draws while hidden |
+| Art packing without new sheets | Byte-identical to the committed packs (manifests, atlases, all 26 action pages) |
+| Visual review | Motion captures of play, a pounce in mid-leap, a treat being eaten and a held pet inspected; no double exposure |
+| Windows installer build | Passed: `out/make/squirrel.windows/x64/ArchieJumiSetup.exe`, SHA-256 `e9365305aa1e6afe83a0bb4bbe4cfd187d67d5e78d94c0a8afa2e92213ede9fe` (not installed) |
+| Packaged native smoke | All 45 required checks passed against the packaged 1.1.0 app |
+
+The 1.1.0 smoke checks run with the scripted cursor:
+
+- motion captures without page errors
+- the treat flow from drop to crumbs
+- hold-to-pet: held after 350 ms, a short hold finishes as a two-second pet, then the kitten sits
+- a quick click is still the two-second pet
+- hover through walking, turning and pounce leaps: the lifted torso hovered 7 of 7 times; a ground point covered only by the unlifted sprite hovered 0 of 6 times
+- Come here from the tray (last rest point) and from the kitten menu (point, then rest), with no target chosen while the pointer stays on the menu row
+- the curious toggle, with attention squares sent apart from the hover rects
+- curiosity end to end: the kitten turned 2,503 ms after the pointer came to rest
+
+Review: eight independent review passes produced 37 findings. 29 were fixed, including both high-severity ones (a short hold petting less than a click, and a test that timed out under load). The rest were rejected by independent verification or judged not worth changing now.
+
 ## Build 1.0.2
 
 Windows x64, from source on the development PC. Checked October 18, 2026.

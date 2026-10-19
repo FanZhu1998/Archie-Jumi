@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_INTEREST_RECTS, validHeartbeat, validInputModePayload, validInterest, validSceneState } from '../src/shared/ipc';
+import { MAX_ATTENTION_RECTS, MAX_INTEREST_RECTS, validHeartbeat, validInputModePayload, validInterest, validSceneState } from '../src/shared/ipc';
 
 const scene = { width: 1280, height: 720 };
 const pet = { action: 'sit', facing: 'left', forcedSleep: false };
@@ -34,11 +34,30 @@ describe('heartbeat payload validation', () => {
 
 describe('interest payload validation', () => {
   const rect = { x: -20, y: 600, width: 180, height: 200 };
+  const square = { x: 300, y: 200, width: 410, height: 410 };
   it('accepts up to eight finite rects that may extend slightly outside the scene', () => {
-    expect(validInterest({ generation: 2, rects: [rect, { ...rect, extra: true }] }, scene)).toEqual({ generation: 2, rects: [rect, rect] });
-    expect(validInterest({ generation: 2, rects: [] }, scene)).toEqual({ generation: 2, rects: [] });
+    expect(validInterest({ generation: 2, rects: [rect, { ...rect, extra: true }] }, scene)).toEqual({ generation: 2, rects: [rect, rect], attention: [] });
+    expect(validInterest({ generation: 2, rects: [] }, scene)).toEqual({ generation: 2, rects: [], attention: [] });
     expect(validInterest({ generation: 2, rects: Array.from({ length: MAX_INTEREST_RECTS }, () => rect) }, scene)?.rects).toHaveLength(8);
     expect(validInterest({ generation: 2, rects: [{ x: 0, y: 0, width: 0, height: 0 }] }, scene)?.rects).toHaveLength(1);
+  });
+
+  it('keeps attention squares apart from the rects: optional, at most four, the same bounds', () => {
+    expect(validInterest({ generation: 2, rects: [rect], attention: [square, { ...square, extra: 1 }] }, scene))
+      .toEqual({ generation: 2, rects: [rect], attention: [square, square] });
+    expect(validInterest({ generation: 2, rects: [], attention: [] }, scene)).toEqual({ generation: 2, rects: [], attention: [] });
+    expect(MAX_ATTENTION_RECTS).toBe(4);
+    const full = validInterest({ generation: 2, rects: Array.from({ length: 8 }, () => rect), attention: Array.from({ length: 4 }, () => square) }, scene);
+    expect([full?.rects.length, full?.attention.length]).toEqual([8, 4]);
+  });
+
+  it.each([
+    { attention: null }, { attention: 'all' }, { attention: {} }, { attention: Array.from({ length: 5 }, () => ({ x: 0, y: 0, width: 1, height: 1 })) },
+    { attention: [null] }, { attention: [{ x: NaN, y: 0, width: 1, height: 1 }] }, { attention: [{ x: 0, y: 0, width: -1, height: 1 }] },
+    { attention: [{ x: 0, y: 0, width: 2561, height: 1 }] }, { attention: [{ x: 0, y: 1441, width: 1, height: 1 }] },
+    { attention: [{ x: 0, y: 0, width: 1, height: '1' }] },
+  ])('rejects the whole payload for invalid attention %j', patch => {
+    expect(validInterest({ generation: 2, rects: [rect], ...patch }, scene)).toBeNull();
   });
 
   it.each([
