@@ -52,6 +52,8 @@ npm run make
 
 `npm run preview` serves a browser-only control-panel preview. It cannot implement native click-through or tray controls. Open `?view=overlay` on the preview server to inspect animations; preview tabs share local preferences and commands.
 
+`npm run screenshots` regenerates the README images in `docs/screenshots/`. It runs the app with a fresh temporary profile, poses the kittens, and captures only the app's own windows; the kittens are drawn on a neutral background, and monitor names are replaced with generic labels.
+
 `npm run smoke` uses an isolated local test profile, captures the app's own windows and writes a report to `test-results/`. It drives hover with a scripted cursor and also checks hold-to-pet, Come here, the treat flow, cursor curiosity and the curious toggle, and hover on a walking, turning kitten. For visual review it saves `motion-play.png`, `motion-pounce.png`, `motion-treat.png` and `motion-held-pet.png` next to the report. It does not certify all monitor, full-screen, DPI, real-pointer or installation scenarios.
 
 `node tests/ui-browser.ts` runs the control panel and the browser playground in a headless browser (Chrome by default; set `UI_TEST_BROWSER=msedge` to use Edge). It covers the settings, including the curious toggle, and a real-mouse hold-to-pet in the playground.

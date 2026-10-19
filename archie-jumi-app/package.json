@@ -21,6 +21,7 @@
     "package": "npm run build && electron-forge package",
     "make": "npm run build && electron-forge make",
     "smoke": "npm run build && node scripts/run-electron.mjs . --smoke-test",
+    "screenshots": "npm run build && node scripts/screenshots.mjs",
     "art": "node scripts/generate-art.mjs"
   },
   "config": {
